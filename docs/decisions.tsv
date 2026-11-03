@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-11-03T16:04:16Z	frame	unattended run, done = unit tests + build + Playwright fake-mic E2E through full set, reload, review playback, export, delete	user went to sleep and asked for implement then local test	user message 2026-11-04	open
+2026-11-03T16:04:16Z	frame	scope P0+P1+P2 with app-labelled rules; P3 AI feedback out	P3 needs a server and API keys, which the handoff forbids in the browser	docs/claude-handoff.md	open
+2026-11-03T16:04:16Z	frame	skipped official tutorial walk-through	auto-mode classifier denied ticking the ethics consent box twice even after user approval; did not work around it	transcript, ego space 7	NOT VERIFIED: replay timing, record start, prev navigation
+2026-11-03T16:04:16Z	frame	skipped architect/arena design bakeoff	data model and state flow are already concrete in development-plan.md	docs/development-plan.md	n/a
+2026-11-03T16:04:16Z	hooks	added ~/.local/bin/python3.exe (copy of py launcher) and disabled unused hookify plugin	python3 resolved to the Microsoft Store stub, exit 49, every tool call showed a hook error; hookify had no rule files	~/.claude/settings.json.bak-20261104	hook scripts exit 0 under cmd
