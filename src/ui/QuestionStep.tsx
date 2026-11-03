@@ -57,10 +57,20 @@ export function QuestionStep(props: Props) {
   const handleRef = useRef<RecordingHandle | null>(null);
   const pendingRef = useRef<Recording | null>(null);
   const elapsed = useElapsed(state.kind === "recording");
+  const mountedRef = useRef(true);
+  const onSaveRef = useRef(props.onSave);
+  onSaveRef.current = props.onSave;
 
-  useEffect(() => () => {
-    stopSpeaking();
-    void handleRef.current?.stop().catch(() => undefined);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopSpeaking();
+      const handle = handleRef.current;
+      handleRef.current = null;
+      // Leaving mid-answer keeps the recording instead of discarding it.
+      void handle?.stop().then(onSaveRef.current).catch((error) => console.error("answer not saved on exit", error));
+    };
   }, []);
 
   async function save(recording: Recording) {
@@ -89,7 +99,12 @@ export function QuestionStep(props: Props) {
     setProblem(null);
     dispatchRaw({ type: "RECORD" });
     try {
-      handleRef.current = startRecording(await requestMic());
+      const stream = await requestMic();
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      handleRef.current = startRecording(stream);
     } catch (error) {
       setProblem(errorMessage(error));
       dispatchRaw({ type: "RECORD_FAILED" });
@@ -117,12 +132,17 @@ export function QuestionStep(props: Props) {
     await save(recording);
   }
 
-  const timeUpRef = useRef(false);
+  const timeUpHandledRef = useRef(false);
   useEffect(() => {
-    if (!props.timeUp || timeUpRef.current) return;
-    timeUpRef.current = true;
+    if (!props.timeUp || timeUpHandledRef.current) return;
     stopSpeaking();
-    void (state.kind === "recording" ? handleStop() : Promise.resolve()).then(() => props.onTimeUpHandled?.());
+    if (state.kind === "recording") {
+      void handleStop();
+      return;
+    }
+    if (state.kind === "saving" || state.kind === "save-failed") return;
+    timeUpHandledRef.current = true;
+    props.onTimeUpHandled?.();
   });
 
   const showPrompt = rules.showPromptText || (state.kind === "answerable" && state.playbackFailed);

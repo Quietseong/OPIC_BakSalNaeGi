@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { requestMic, startRecording } from "../media/recorder";
 import { errorMessage } from "./format";
@@ -15,6 +15,14 @@ type CheckState =
 
 export function MicCheck({ onReady, onBack }: Props) {
   const [check, setCheck] = useState<CheckState>({ kind: "idle" });
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => () => {
     if (check.kind === "done") URL.revokeObjectURL(check.url);
@@ -26,6 +34,7 @@ export function MicCheck({ onReady, onBack }: Props) {
       const handle = startRecording(await requestMic());
       await new Promise((resolve) => setTimeout(resolve, TEST_MS));
       const recording = await handle.stop();
+      if (!mountedRef.current) return;
       setCheck({ kind: "done", url: URL.createObjectURL(recording.blob) });
     } catch (error) {
       setCheck({ kind: "failed", message: errorMessage(error) });

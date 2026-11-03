@@ -107,3 +107,57 @@ test("audio: a generated question file is played instead of speech synthesis", a
   await expect(page.locator(".prompt[lang=en]")).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toEqual([]);
 });
+
+test("exam: when 40 minutes run out mid-answer the recording is saved and the session ends", async ({ page }) => {
+  await page.clock.install();
+  await installSpeechStub(page);
+  await startSession(page, "exam");
+  await page.getByRole("button", { name: /질문 듣기/ }).click();
+  await page.getByRole("button", { name: "녹음 시작" }).click();
+  await expect(page.getByRole("button", { name: "녹음 정지" })).toBeVisible();
+  await page.waitForTimeout(800);
+  await page.clock.fastForward("40:00");
+  await expect(page.getByRole("heading", { name: "모든 문항을 마쳤습니다" })).toBeVisible();
+  await page.getByRole("button", { name: "복기하기" }).click();
+  await expect(page.locator("audio")).toHaveCount(1);
+});
+
+test("leaving mid-answer keeps the recording", async ({ page }) => {
+  await installSpeechStub(page);
+  await startSession(page, "practice");
+  await page.getByRole("button", { name: /질문 듣기/ }).click();
+  await page.getByRole("button", { name: "녹음 시작" }).click();
+  await expect(page.getByRole("button", { name: "녹음 정지" })).toBeVisible();
+  await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: "나가기 (진행 상태는 저장됨)" }).click();
+  await page.getByRole("button", { name: "복기" }).click();
+  await expect(page.locator("audio")).toHaveCount(1);
+});
+
+test("exam: a failed save at time-up keeps the retry instead of ending and losing the answer", async ({ page }) => {
+  await page.clock.install();
+  await installSpeechStub(page);
+  await startSession(page, "exam");
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.put;
+    let failures = 1;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
+      if (this.name === "recordings" && failures > 0) {
+        failures -= 1;
+        throw new DOMException("quota", "QuotaExceededError");
+      }
+      return original.apply(this, args);
+    };
+  });
+  await page.getByRole("button", { name: /질문 듣기/ }).click();
+  await page.getByRole("button", { name: "녹음 시작" }).click();
+  await expect(page.getByRole("button", { name: "녹음 정지" })).toBeVisible();
+  await page.waitForTimeout(800);
+  await page.clock.fastForward("40:00");
+  await expect(page.getByRole("button", { name: "저장 다시 시도" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모든 문항을 마쳤습니다" })).toHaveCount(0);
+  await page.getByRole("button", { name: "저장 다시 시도" }).click();
+  await expect(page.getByRole("heading", { name: "모든 문항을 마쳤습니다" })).toBeVisible();
+  await page.getByRole("button", { name: "복기하기" }).click();
+  await expect(page.locator("audio")).toHaveCount(1);
+});
