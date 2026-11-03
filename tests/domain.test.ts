@@ -45,6 +45,10 @@ describe("question runner", () => {
     expect(state.kind).toBe("recording");
   });
 
+  it("should_return_to_answerable_when_the_microphone_fails_to_start", () => {
+    expect(run(EXAM, "PLAY", "PLAY_ENDED", "RECORD", "RECORD_FAILED").kind).toBe("answerable");
+  });
+
   it("should_block_listening_while_recording", () => {
     const recording = run(PRACTICE, "PLAY", "PLAY_ENDED", "RECORD");
     expect(runnerReducer(recording, { type: "PLAY" }, PRACTICE)).toBe(recording);

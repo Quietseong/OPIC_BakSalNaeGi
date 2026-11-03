@@ -56,8 +56,15 @@ export class PracticeStore {
   private async write(operation: string, stores: string[], work: (tx: IDBTransaction) => void): Promise<void> {
     try {
       const tx = this.db.transaction(stores, "readwrite");
-      work(tx);
-      await done(tx);
+      const completion = done(tx);
+      try {
+        work(tx);
+      } catch (error) {
+        tx.abort();
+        await completion.catch(() => undefined);
+        throw error;
+      }
+      await completion;
     } catch (error) {
       throw new StorageError(operation, error);
     }

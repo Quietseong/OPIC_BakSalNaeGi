@@ -17,6 +17,7 @@ export type RunnerEvent =
   | { type: "PLAY_ENDED" }
   | { type: "PLAY_FAILED" }
   | { type: "RECORD" }
+  | { type: "RECORD_FAILED" }
   | { type: "STOP" }
   | { type: "SAVE_OK" }
   | { type: "SAVE_FAILED"; message: string }
@@ -49,6 +50,8 @@ export function runnerReducer(state: RunnerState, event: RunnerEvent, rules: Run
       return state.kind === "playing" ? { kind: "answerable", listens, playbackFailed: true } : state;
     case "RECORD":
       return canRecord(state) ? { kind: "recording", listens } : state;
+    case "RECORD_FAILED":
+      return state.kind === "recording" ? { kind: "answerable", listens, playbackFailed: false } : state;
     case "STOP":
       return state.kind === "recording" ? { kind: "saving", listens } : state;
     case "SAVE_OK":

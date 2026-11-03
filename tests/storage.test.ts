@@ -70,6 +70,13 @@ describe("PracticeStore", () => {
     expect((await store.listAttempts("s1"))[0]?.note).toBe("past tense mistakes");
   });
 
+  it("should_not_keep_attempt_metadata_when_the_recording_write_fails", async () => {
+    const unclonable = { arrayBuffer: () => undefined } as unknown as Blob;
+    Object.defineProperty(unclonable, "fn", { value: () => undefined, enumerable: true });
+    await expect(store.saveAttempt(attempt("a1", "a-01", 1), unclonable)).rejects.toBeInstanceOf(StorageError);
+    expect(await store.listAttempts("s1")).toEqual([]);
+  });
+
   it("should_raise_a_storage_error_when_the_database_is_closed", async () => {
     store.close();
     await expect(store.saveSession(session)).rejects.toBeInstanceOf(StorageError);
