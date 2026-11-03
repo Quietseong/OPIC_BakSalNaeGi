@@ -96,3 +96,14 @@ test("errors: a failed save is shown, Next stays blocked, and retry stores the a
   await expect(page.locator("audio")).toHaveCount(1);
   await expect(page.locator("[data-attempt-no]")).toHaveCount(1);
 });
+
+test("audio: a generated question file is played instead of speech synthesis", async ({ page }) => {
+  await installSpeechStub(page, "fails", { serveAudioFiles: true });
+  await startSession(page, "exam");
+  await page.getByRole("button", { name: /질문 듣기/ }).click();
+  await expect(page.getByRole("status").filter({ hasText: "질문을 재생하고 있습니다." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "녹음 시작" })).toBeEnabled({ timeout: 20_000 });
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".prompt[lang=en]")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toEqual([]);
+});

@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import { INITIAL_RUNNER_STATE, canAdvance, canListen, canRecord, runnerReducer } from "../domain/runner";
 import { requestMic, startRecording } from "../media/recorder";
-import { speak, stopSpeaking } from "../media/speech";
+import { playQuestion, stopSpeaking } from "../media/speech";
 import { errorMessage, formatDuration } from "./format";
 
 import type { RunnerRules, RunnerState } from "../domain/runner";
@@ -77,7 +77,7 @@ export function QuestionStep(props: Props) {
     setProblem(null);
     dispatchRaw({ type: "PLAY" });
     try {
-      await speak(question.prompt);
+      await playQuestion(question);
       dispatchRaw({ type: "PLAY_ENDED" });
     } catch (error) {
       setProblem(`${errorMessage(error)} 질문 텍스트를 보고 답변하세요.`);

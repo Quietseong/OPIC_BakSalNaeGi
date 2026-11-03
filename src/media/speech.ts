@@ -42,6 +42,37 @@ export async function speak(text: string): Promise<void> {
   });
 }
 
+let currentAudio: HTMLAudioElement | null = null;
+
+function playFile(src: string): Promise<void> {
+  const audio = new Audio(src);
+  currentAudio = audio;
+  return new Promise((resolve, reject) => {
+    audio.onended = () => resolve();
+    audio.onerror = () => reject(new Error(`질문 음성 파일 없음: ${src}`));
+    audio.play().catch(reject);
+  });
+}
+
+// Pre-generated files (npm run audio) come first because some Chromium builds ship without speech voices.
+export async function playQuestion(question: { id: string; prompt: string }): Promise<void> {
+  try {
+    await playFile(`${import.meta.env.BASE_URL}audio/${question.id}.wav`);
+  } catch (fileError) {
+    try {
+      await speak(question.prompt);
+    } catch (speechError) {
+      throw new Error(errorText(speechError), { cause: fileError });
+    }
+  }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function stopSpeaking(): void {
+  currentAudio?.pause();
+  currentAudio = null;
   if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
 }

@@ -4,7 +4,8 @@ import type { Page } from "@playwright/test";
 
 export type SpeechMode = "speaks" | "fails";
 
-export async function installSpeechStub(page: Page, mode: SpeechMode = "speaks") {
+export async function installSpeechStub(page: Page, mode: SpeechMode = "speaks", options = { serveAudioFiles: false }) {
+  if (!options.serveAudioFiles) await page.route("**/audio/*.wav", (route) => route.fulfill({ status: 404 }));
   await page.addInitScript((speechMode) => {
     const voice = { lang: "en-US", name: "stub", voiceURI: "stub", default: true, localService: true };
     class StubUtterance {
