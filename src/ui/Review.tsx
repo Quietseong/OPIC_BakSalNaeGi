@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { newAttempt } from "../domain/attempt";
 import { findQuestion } from "../domain/questions";
+import { scheduleReview } from "../domain/review-schedule";
 import { rulesFor } from "../domain/types";
 import { nextAttemptNo } from "../storage/db";
-import { errorMessage, formatDate, formatDuration } from "./format";
+import { AttemptRow } from "./AttemptRow";
+import { errorMessage, formatDate } from "./format";
 import { QuestionStep } from "./QuestionStep";
 
 import type { Recording } from "../media/recorder";
@@ -11,10 +14,6 @@ import type { PracticeStore } from "../storage/db";
 import type { Attempt, Question, Session } from "../domain/types";
 
 type Props = { store: PracticeStore; sessionId: string; onHome: () => void };
-
-function extensionFor(mimeType: string): string {
-  return mimeType.includes("mp4") ? "m4a" : "webm";
-}
 
 function downloadJson(filename: string, data: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -96,19 +95,20 @@ type ItemProps = {
 
 function ReviewItem({ store, sessionId, question, attempts, allAttempts, onChanged }: ItemProps) {
   const [isAnsweringAgain, setIsAnsweringAgain] = useState(false);
+  const [reviewDue, setReviewDue] = useState<number | null>(null);
+  const latestRevision = [...attempts].reverse().find((attempt) => attempt.revised.trim() !== "")?.revised;
+
+  async function addToReview() {
+    const card = scheduleReview(await store.getReviewCard(question.id), question.id, "stuck", Date.now());
+    await store.saveReviewCard(card);
+    setReviewDue(card.dueAt);
+  }
 
   async function saveAgain(recording: Recording) {
-    const attempt: Attempt = {
-      id: crypto.randomUUID(),
-      sessionId,
-      questionId: question.id,
-      attemptNo: nextAttemptNo(allAttempts, question.id),
-      mimeType: recording.mimeType,
-      durationMs: recording.durationMs,
-      sizeBytes: recording.blob.size,
-      createdAt: Date.now(),
-      note: "",
-    };
+    const attempt = newAttempt(
+      { sessionId, questionId: question.id, attemptNo: nextAttemptNo(allAttempts, question.id), mimeType: recording.mimeType, durationMs: recording.durationMs, sizeBytes: recording.blob.size },
+      { id: crypto.randomUUID(), now: Date.now() },
+    );
     await store.saveAttempt(attempt, recording.blob);
     await onChanged();
   }
@@ -121,6 +121,13 @@ function ReviewItem({ store, sessionId, question, attempts, allAttempts, onChang
       {attempts.map((attempt) => (
         <AttemptRow key={attempt.id} store={store} attempt={attempt} onChanged={onChanged} />
       ))}
+      <div className="actions">
+        <button type="button" onClick={() => void addToReview()} disabled={reviewDue !== null}>복습 목록에 넣기</button>
+        {reviewDue !== null && <span role="status">{formatDate(reviewDue)}에 다시 나옵니다.</span>}
+      </div>
+      {isAnsweringAgain && latestRevision && (
+        <p className="revision-ref"><strong>고친 문장 보며 말하기 · </strong><span lang="en">{latestRevision}</span></p>
+      )}
       {isAnsweringAgain ? (
         <QuestionStep
           question={question}
@@ -134,55 +141,5 @@ function ReviewItem({ store, sessionId, question, attempts, allAttempts, onChang
         <button type="button" onClick={() => setIsAnsweringAgain(true)}>이 질문에 다시 답변</button>
       )}
     </li>
-  );
-}
-
-function AttemptRow({ store, attempt, onChanged }: { store: PracticeStore; attempt: Attempt; onChanged: () => Promise<void> }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [note, setNote] = useState(attempt.note);
-  const [problem, setProblem] = useState<string | null>(null);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    void store.getRecording(attempt.id).then((blob) => {
-      if (!blob) return setProblem("녹음 파일을 찾을 수 없습니다.");
-      objectUrl = URL.createObjectURL(blob);
-      setUrl(objectUrl);
-    }, (error) => setProblem(errorMessage(error)));
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [store, attempt.id]);
-
-  async function saveNote() {
-    if (note === attempt.note) return;
-    try {
-      await store.updateNote(attempt.id, note);
-    } catch (error) {
-      setProblem(errorMessage(error));
-    }
-  }
-
-  async function remove() {
-    if (!window.confirm(`${attempt.attemptNo}번째 답변을 삭제할까요?`)) return;
-    await store.deleteAttempt(attempt.id);
-    await onChanged();
-  }
-
-  const label = `${attempt.attemptNo}번째 답변 · ${formatDuration(attempt.durationMs)}`;
-  return (
-    <div className="attempt" data-attempt-no={attempt.attemptNo}>
-      <p className="attempt-title">{label} · {formatDate(attempt.createdAt)}</p>
-      {url && <audio controls src={url} aria-label={label} />}
-      <div className="actions">
-        {url && <a href={url} download={`answer-${attempt.questionId}-${attempt.attemptNo}.${extensionFor(attempt.mimeType)}`}>음성 파일 받기</a>}
-        <button type="button" className="danger" onClick={remove}>답변 삭제</button>
-      </div>
-      <label>
-        자가 메모
-        <textarea value={note} onChange={(event) => setNote(event.target.value)} onBlur={saveNote} rows={2} />
-      </label>
-      {problem && <p className="error" role="alert">{problem}</p>}
-    </div>
   );
 }

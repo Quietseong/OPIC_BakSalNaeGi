@@ -14,7 +14,7 @@ const session = createSession(
 );
 
 function attempt(id: string, questionId: string, attemptNo: number, sessionId = "s1"): Attempt {
-  return { id, sessionId, questionId, attemptNo, mimeType: "audio/webm", durationMs: 2000, sizeBytes: 3, createdAt: attemptNo, note: "" };
+  return { id, sessionId, questionId, attemptNo, mimeType: "audio/webm", durationMs: 2000, sizeBytes: 3, createdAt: attemptNo, note: "", transcript: "", revised: "" };
 }
 
 describe("PracticeStore", () => {
@@ -68,10 +68,15 @@ describe("PracticeStore", () => {
     expect(await store.getRecording("a2")).toBeUndefined();
   });
 
-  it("should_persist_a_self_review_note", async () => {
+  it("should_persist_note_transcript_and_revision_independently", async () => {
     await store.saveAttempt(attempt("a1", "a-01", 1), new Blob(["x"]));
-    await store.updateNote("a1", "past tense mistakes");
-    expect((await store.listAttempts("s1"))[0]?.note).toBe("past tense mistakes");
+    await store.updateAttemptText("a1", { note: "past tense mistakes" });
+    await store.updateAttemptText("a1", { transcript: "I go there yesterday", revised: "I went there yesterday" });
+    expect((await store.listAttempts("s1"))[0]).toMatchObject({
+      note: "past tense mistakes",
+      transcript: "I go there yesterday",
+      revised: "I went there yesterday",
+    });
   });
 
   it("should_not_keep_attempt_metadata_when_the_recording_write_fails", async () => {
@@ -100,5 +105,53 @@ describe("nextAttemptNo", () => {
   it("should_not_reuse_a_number_after_an_earlier_attempt_was_deleted", () => {
     expect(nextAttemptNo([attempt("a2", "a-01", 2)], "a-01")).toBe(3);
     expect(nextAttemptNo([], "a-01")).toBe(1);
+  });
+});
+
+describe("database upgrade", () => {
+  it("should_keep_version_1_recordings_and_fill_the_new_text_fields", async () => {
+    const factory = new IDBFactory();
+    const request = factory.open("opic-practice", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore("sessions", { keyPath: "id" });
+      db.createObjectStore("attempts", { keyPath: "id" }).createIndex("bySession", "sessionId");
+      db.createObjectStore("recordings");
+    };
+    const v1 = await new Promise<IDBDatabase>((resolve) => (request.onsuccess = () => resolve(request.result)));
+    const tx = v1.transaction(["attempts", "recordings"], "readwrite");
+    tx.objectStore("attempts").put({ id: "old", sessionId: "s1", questionId: "a-01", attemptNo: 1, mimeType: "audio/webm", durationMs: 1, sizeBytes: 1, createdAt: 1, note: "memo" });
+    tx.objectStore("recordings").put(new Blob(["x"]), "old");
+    await new Promise((resolve) => (tx.oncomplete = resolve));
+    v1.close();
+
+    const store = await PracticeStore.open(factory);
+    expect((await store.listAttempts("s1"))[0]).toMatchObject({ note: "memo", transcript: "", revised: "" });
+    expect(await store.getRecording("old")).toBeDefined();
+    expect(await store.listReviewCards()).toEqual([]);
+    store.close();
+  });
+});
+
+describe("training and review storage", () => {
+  it("should_delete_a_training_with_its_round_recordings", async () => {
+    const store = await PracticeStore.open(new IDBFactory());
+    await store.saveTraining({ id: "t1", questionId: "cafe-d1", createdAt: 1, roundLimitsSec: [90, 70, 50] });
+    await store.saveAttempt(attempt("r1", "cafe-d1", 1, "t1"), new Blob(["x"]));
+    expect((await store.listTrainings()).map((t) => t.id)).toEqual(["t1"]);
+    await store.deleteTraining("t1");
+    expect(await store.listTrainings()).toEqual([]);
+    expect(await store.getRecording("r1")).toBeUndefined();
+    store.close();
+  });
+
+  it("should_keep_one_review_card_per_question", async () => {
+    const store = await PracticeStore.open(new IDBFactory());
+    await store.saveReviewCard({ questionId: "cafe-d1", box: 0, dueAt: 10, updatedAt: 1 });
+    await store.saveReviewCard({ questionId: "cafe-d1", box: 1, dueAt: 20, updatedAt: 2 });
+    expect(await store.listReviewCards()).toEqual([{ questionId: "cafe-d1", box: 1, dueAt: 20, updatedAt: 2 }]);
+    await store.deleteReviewCard("cafe-d1");
+    expect(await store.getReviewCard("cafe-d1")).toBeUndefined();
+    store.close();
   });
 });

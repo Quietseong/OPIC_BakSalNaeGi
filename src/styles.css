@@ -95,3 +95,12 @@ main.exam { max-width: 1040px; }
 .level-bar { height: 100%; background: #2e8b57; transform-origin: left; transform: scaleX(0); }
 .exam-footer { margin-top: auto; justify-content: flex-end; }
 .next-button { min-width: 140px; }
+
+.coaching { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; background: var(--bg); }
+.coaching summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.skeleton { margin: 8px 0; padding-left: 20px; }
+.chunks { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; }
+.chunks li span[lang="en"] { font-weight: 600; }
+.field-hint { font-size: 0.85rem; }
+.revision-ref { padding: 8px 12px; border-left: 4px solid var(--primary); background: var(--bg); }
+h3 { font-size: 1rem; margin: 16px 0 4px; }

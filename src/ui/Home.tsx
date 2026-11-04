@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { MIN_SURVEY_TOPICS } from "../domain/generate";
 import { errorMessage, formatDate } from "./format";
 import { SurveyFields } from "./SurveyFields";
+import { TrainingPanel } from "./TrainingPanel";
 
 import type { PracticeStore } from "../storage/db";
 import type { Mode, PracticeTargetSec, SelfAssessment, Session, SessionSettings } from "../domain/types";
@@ -12,6 +13,8 @@ type Props = {
   onStart: (settings: SessionSettings) => void;
   onResume: (sessionId: string) => void;
   onReview: (sessionId: string) => void;
+  onTrain: (questionId: string | null) => void;
+  onTrainingResult: (trainingId: string) => void;
 };
 
 function usePersistence(): string {
@@ -23,7 +26,7 @@ function usePersistence(): string {
   return text;
 }
 
-export function Home({ store, onStart, onResume, onReview }: Props) {
+export function Home({ store, onStart, onResume, onReview, onTrain, onTrainingResult }: Props) {
   const [mode, setMode] = useState<Mode>("practice");
   const [target, setTarget] = useState<PracticeTargetSec>(120);
   const [topicIds, setTopicIds] = useState<string[]>([]);
@@ -40,6 +43,7 @@ export function Home({ store, onStart, onResume, onReview }: Props) {
   return (
     <main>
       <h1>OPIc 말하기 연습</h1>
+      <TrainingPanel store={store} onTrain={onTrain} onTrainingResult={onTrainingResult} />
       <form
         className="card"
         onSubmit={(event) => {

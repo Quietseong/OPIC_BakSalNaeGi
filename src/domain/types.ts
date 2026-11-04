@@ -124,4 +124,22 @@ export type Attempt = {
   sizeBytes: number;
   createdAt: number;
   note: string;
+  transcript: string;
+  revised: string;
+};
+
+export type AttemptText = Pick<Attempt, "note" | "transcript" | "revised">;
+
+export type TrainingRecord = {
+  id: string;
+  questionId: string;
+  createdAt: number;
+  roundLimitsSec: number[];
+};
+
+export type ReviewCard = {
+  questionId: string;
+  box: number;
+  dueAt: number;
+  updatedAt: number;
 };

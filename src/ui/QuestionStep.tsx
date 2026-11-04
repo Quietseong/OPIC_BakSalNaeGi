@@ -4,6 +4,7 @@ import { INITIAL_RUNNER_STATE, canAdvance, canListen, canRecord, runnerReducer }
 import { requestMic, startRecording } from "../media/recorder";
 import { playQuestion, stopSpeaking } from "../media/speech";
 import { errorMessage, formatDuration } from "./format";
+import { CoachingCard } from "./CoachingCard";
 import { LevelMeter } from "./LevelMeter";
 
 import type { RunnerRules, RunnerState } from "../domain/runner";
@@ -15,6 +16,9 @@ type Props = {
   heading: string;
   rules: RunnerRules & { showPromptText: boolean };
   practiceTargetSec: number | null;
+  hardLimitSec?: number;
+  showCoaching?: boolean;
+  nextLabel?: string;
   alreadySaved: boolean;
   timeUp?: boolean;
   onSave: (recording: Recording) => Promise<void>;
@@ -136,6 +140,11 @@ export function QuestionStep(props: Props) {
     await save(recording);
   }
 
+  const reachedHardLimit = props.hardLimitSec !== undefined && state.kind === "recording" && elapsed >= props.hardLimitSec * 1000;
+  useEffect(() => {
+    if (reachedHardLimit) void handleStop();
+  });
+
   const timeUpHandledRef = useRef(false);
   useEffect(() => {
     if (!props.timeUp || timeUpHandledRef.current) return;
@@ -175,10 +184,11 @@ export function QuestionStep(props: Props) {
             <button type="button" className="primary record-button" onClick={handleRecord} disabled={!canRecord(state)}>녹음 시작</button>
           )}
           {liveStream && <LevelMeter stream={liveStream} />}
-          {state.kind === "recording" && <RecordingClock elapsed={elapsed} targetSec={props.practiceTargetSec} />}
+          {state.kind === "recording" && <RecordingClock elapsed={elapsed} targetSec={props.hardLimitSec ?? props.practiceTargetSec} isHardLimit={props.hardLimitSec !== undefined} />}
         </div>
       </div>
       {showPrompt ? <p className="prompt" lang="en">{question.prompt}</p> : <p className="prompt muted">질문을 듣고 답하세요.</p>}
+      {props.showCoaching && <CoachingCard type={question.type} />}
       <p className="status" role="status" aria-live="polite" data-state={state.kind}>{STATUS_TEXT[state.kind]}</p>
       {state.kind === "save-failed" && <p className="error" role="alert">{state.message}</p>}
       {problem && <p className="error" role="alert">{problem}</p>}
@@ -189,7 +199,7 @@ export function QuestionStep(props: Props) {
         )}
         {props.onNext && (
           <button type="button" className="primary next-button" onClick={props.onNext} disabled={!canAdvance(state)}>
-            다음 문항 <span aria-hidden="true">›</span>
+            {props.nextLabel ?? "다음 문항"} <span aria-hidden="true">›</span>
           </button>
         )}
       </div>
@@ -197,13 +207,14 @@ export function QuestionStep(props: Props) {
   );
 }
 
-function RecordingClock({ elapsed, targetSec }: { elapsed: number; targetSec: number | null }) {
+function RecordingClock({ elapsed, targetSec, isHardLimit }: { elapsed: number; targetSec: number | null; isHardLimit: boolean }) {
   const reached = targetSec !== null && elapsed >= targetSec * 1000;
+  const label = isHardLimit ? "제한 시간" : "연습 목표";
   return (
     <p className="clock">
       경과 {formatDuration(elapsed)}
-      {targetSec !== null && ` / 연습 목표 ${formatDuration(targetSec * 1000)}`}
-      {reached && " · 목표 도달 (자동으로 끊지 않습니다)"}
+      {targetSec !== null && ` / ${label} ${formatDuration(targetSec * 1000)}`}
+      {reached && !isHardLimit && " · 목표 도달 (자동으로 끊지 않습니다)"}
     </p>
   );
 }

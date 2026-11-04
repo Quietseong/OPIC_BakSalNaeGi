@@ -1,12 +1,14 @@
 import { PRACTICE_SET_A } from "../domain/question-sets";
 
-import type { Attempt, Session } from "../domain/types";
+import type { Attempt, AttemptText, ReviewCard, Session, TrainingRecord } from "../domain/types";
 
 const DB_NAME = "opic-practice";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SESSIONS = "sessions";
 const ATTEMPTS = "attempts";
 const RECORDINGS = "recordings";
+const TRAININGS = "trainings";
+const REVIEWS = "reviews";
 const BY_SESSION = "bySession";
 
 export class StorageError extends Error {
@@ -31,11 +33,21 @@ function done(tx: IDBTransaction): Promise<void> {
   });
 }
 
-function upgrade(db: IDBDatabase): void {
-  db.createObjectStore(SESSIONS, { keyPath: "id" });
-  const attempts = db.createObjectStore(ATTEMPTS, { keyPath: "id" });
-  attempts.createIndex(BY_SESSION, "sessionId");
-  db.createObjectStore(RECORDINGS);
+function upgrade(db: IDBDatabase, oldVersion: number): void {
+  if (oldVersion < 1) {
+    db.createObjectStore(SESSIONS, { keyPath: "id" });
+    const attempts = db.createObjectStore(ATTEMPTS, { keyPath: "id" });
+    attempts.createIndex(BY_SESSION, "sessionId");
+    db.createObjectStore(RECORDINGS);
+  }
+  if (oldVersion < 2) {
+    db.createObjectStore(TRAININGS, { keyPath: "id" });
+    db.createObjectStore(REVIEWS, { keyPath: "questionId" });
+  }
+}
+
+function normalizeAttempt(stored: Attempt): Attempt {
+  return { ...stored, transcript: stored.transcript ?? "", revised: stored.revised ?? "" };
 }
 
 const LEGACY_SECOND_SESSION = {
@@ -60,7 +72,7 @@ export class PracticeStore {
 
   static async open(factory: IDBFactory = indexedDB, name = DB_NAME): Promise<PracticeStore> {
     const request = factory.open(name, DB_VERSION);
-    request.onupgradeneeded = () => upgrade(request.result);
+    request.onupgradeneeded = (event) => upgrade(request.result, event.oldVersion);
     try {
       return new PracticeStore(await promisify(request));
     } catch (error) {
@@ -121,17 +133,17 @@ export class PracticeStore {
     const attempts = await this.read<Attempt[]>("listAttempts", ATTEMPTS, (s) =>
       s.index(BY_SESSION).getAll(sessionId),
     );
-    return attempts.sort((a, b) => a.createdAt - b.createdAt);
+    return attempts.map(normalizeAttempt).sort((a, b) => a.createdAt - b.createdAt);
   }
 
   getRecording(attemptId: string): Promise<Blob | undefined> {
     return this.read("getRecording", RECORDINGS, (s) => s.get(attemptId));
   }
 
-  async updateNote(attemptId: string, note: string): Promise<void> {
-    const attempt = await this.read<Attempt | undefined>("updateNote", ATTEMPTS, (s) => s.get(attemptId));
-    if (!attempt) throw new StorageError("updateNote", new Error(`no attempt ${attemptId}`));
-    await this.write("updateNote", [ATTEMPTS], (tx) => tx.objectStore(ATTEMPTS).put({ ...attempt, note }));
+  async updateAttemptText(attemptId: string, patch: Partial<AttemptText>): Promise<void> {
+    const attempt = await this.read<Attempt | undefined>("updateAttemptText", ATTEMPTS, (s) => s.get(attemptId));
+    if (!attempt) throw new StorageError("updateAttemptText", new Error(`no attempt ${attemptId}`));
+    await this.write("updateAttemptText", [ATTEMPTS], (tx) => tx.objectStore(ATTEMPTS).put({ ...normalizeAttempt(attempt), ...patch }));
   }
 
   deleteAttempt(attemptId: string): Promise<void> {
@@ -141,10 +153,47 @@ export class PracticeStore {
     });
   }
 
-  async deleteSession(sessionId: string): Promise<void> {
-    const attempts = await this.listAttempts(sessionId);
-    await this.write("deleteSession", [SESSIONS, ATTEMPTS, RECORDINGS], (tx) => {
-      tx.objectStore(SESSIONS).delete(sessionId);
+  saveTraining(record: TrainingRecord): Promise<void> {
+    return this.write("saveTraining", [TRAININGS], (tx) => tx.objectStore(TRAININGS).put(record));
+  }
+
+  getTraining(id: string): Promise<TrainingRecord | undefined> {
+    return this.read("getTraining", TRAININGS, (s) => s.get(id));
+  }
+
+  async listTrainings(): Promise<TrainingRecord[]> {
+    const records = await this.read<TrainingRecord[]>("listTrainings", TRAININGS, (s) => s.getAll());
+    return records.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  saveReviewCard(card: ReviewCard): Promise<void> {
+    return this.write("saveReviewCard", [REVIEWS], (tx) => tx.objectStore(REVIEWS).put(card));
+  }
+
+  getReviewCard(questionId: string): Promise<ReviewCard | undefined> {
+    return this.read("getReviewCard", REVIEWS, (s) => s.get(questionId));
+  }
+
+  listReviewCards(): Promise<ReviewCard[]> {
+    return this.read("listReviewCards", REVIEWS, (s) => s.getAll());
+  }
+
+  deleteReviewCard(questionId: string): Promise<void> {
+    return this.write("deleteReviewCard", [REVIEWS], (tx) => tx.objectStore(REVIEWS).delete(questionId));
+  }
+
+  deleteTraining(trainingId: string): Promise<void> {
+    return this.deleteOwner(TRAININGS, trainingId);
+  }
+
+  deleteSession(sessionId: string): Promise<void> {
+    return this.deleteOwner(SESSIONS, sessionId);
+  }
+
+  private async deleteOwner(ownerStore: string, ownerId: string): Promise<void> {
+    const attempts = await this.listAttempts(ownerId);
+    await this.write(`delete ${ownerStore}`, [ownerStore, ATTEMPTS, RECORDINGS], (tx) => {
+      tx.objectStore(ownerStore).delete(ownerId);
       for (const attempt of attempts) {
         tx.objectStore(ATTEMPTS).delete(attempt.id);
         tx.objectStore(RECORDINGS).delete(attempt.id);

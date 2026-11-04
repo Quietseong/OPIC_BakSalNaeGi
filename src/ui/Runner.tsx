@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { newAttempt } from "../domain/attempt";
 import { findQuestion } from "../domain/questions";
 import { advance, chooseDifficulty, finish, firstSessionLength, remainingMs, stageOf } from "../domain/session";
 import { DIFFICULTIES, rulesFor } from "../domain/types";
@@ -65,17 +66,10 @@ export function Runner({ store, sessionId, onReview, onHome }: Props) {
   if (!session) return <p role="status">불러오는 중…</p>;
 
   async function saveRecording(questionId: string, recording: Recording) {
-    const attempt: Attempt = {
-      id: crypto.randomUUID(),
-      sessionId,
-      questionId,
-      attemptNo: nextAttemptNo(attempts, questionId),
-      mimeType: recording.mimeType,
-      durationMs: recording.durationMs,
-      sizeBytes: recording.blob.size,
-      createdAt: Date.now(),
-      note: "",
-    };
+    const attempt = newAttempt(
+      { sessionId, questionId, attemptNo: nextAttemptNo(attempts, questionId), mimeType: recording.mimeType, durationMs: recording.durationMs, sizeBytes: recording.blob.size },
+      { id: crypto.randomUUID(), now: Date.now() },
+    );
     await store.saveAttempt(attempt, recording.blob);
     setAttempts((current) => [...current, attempt]);
   }
@@ -142,6 +136,7 @@ function Stage({ session, attempts, timeUp, onSaveRecording, onPersist, onReview
       heading={`${part} 세션 · 문항 ${stage.number}`}
       rules={{ ...rules, allowRerecord: session.settings.mode === "practice" }}
       practiceTargetSec={session.settings.practiceTargetSec}
+      showCoaching={session.settings.mode === "practice"}
       alreadySaved={attempts.some((attempt) => attempt.questionId === question.id)}
       timeUp={timeUp}
       onSave={(recording) => onSaveRecording(question.id, recording)}

@@ -33,12 +33,12 @@ test("practice: full 14-question set survives a reload and can be reviewed, re-a
   await answerCurrentQuestion(page);
   await expect(firstItem.locator("[data-attempt-no]")).toHaveCount(2);
 
-  const note = firstItem.locator("[data-attempt-no='1'] textarea");
+  const note = firstItem.locator("[data-attempt-no='1']").getByLabel("자가 메모");
   await note.fill("과거 시제를 섞어 씀");
   await note.blur();
   await page.reload();
   await page.getByRole("button", { name: "복기" }).click();
-  await expect(page.locator(".review-item").first().locator("[data-attempt-no='1'] textarea")).toHaveValue("과거 시제를 섞어 씀");
+  await expect(page.locator(".review-item").first().locator("[data-attempt-no='1']").getByLabel("자가 메모")).toHaveValue("과거 시제를 섞어 씀");
   await expect(page.locator("audio")).toHaveCount(15);
 
   const download = page.waitForEvent("download");
