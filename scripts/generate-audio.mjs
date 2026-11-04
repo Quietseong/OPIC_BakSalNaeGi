@@ -43,19 +43,48 @@ $synth.SetOutputToNull()
 Write-Output $voice.VoiceInfo.Name
 `;
 
+const venvPython = join(root, ".tts", "venv", "Scripts", "python.exe");
+const modelsDir = join(root, ".tts", "models");
+const manifestPath = join(outDir, "manifest.json");
+
+function option(name, fallback) {
+  const arg = process.argv.find((value) => value.startsWith(`--${name}=`));
+  return arg ? arg.slice(name.length + 3) : fallback;
+}
+
+const hasKokoro = existsSync(venvPython) && existsSync(join(modelsDir, "kokoro-v1.0.onnx"));
+const engine = option("engine", hasKokoro ? "kokoro" : "windows");
+const voice = engine === "kokoro" ? option("voice", "af_heart") : "windows-default";
+const speed = option("speed", "0.95");
+if (engine === "kokoro" && !hasKokoro) throw new Error("Kokoro is not installed. Run npm run tts:setup first.");
+
+function synthesize(jobFile) {
+  if (engine === "kokoro") {
+    const args = [join(root, "scripts", "tts_kokoro.py"), jobFile, join(modelsDir, "kokoro-v1.0.onnx"), join(modelsDir, "voices-v1.0.bin"), voice, speed];
+    execFileSync(venvPython, args, { stdio: "inherit" });
+    return `kokoro ${voice}`;
+  }
+  const scriptFile = join(tmpdir(), `opic-audio-${Date.now()}.ps1`);
+  writeFileSync(scriptFile, POWERSHELL_SCRIPT, "utf8");
+  return execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptFile, jobFile], { encoding: "utf8" }).trim();
+}
+
+const wanted = { engine, voice, speed: engine === "kokoro" ? speed : null };
+const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : null;
+const voiceChanged = JSON.stringify(previous) !== JSON.stringify(wanted);
+
 const questions = await loadQuestions();
 mkdirSync(outDir, { recursive: true });
 const jobs = questions
   .map((question) => ({ path: join(outDir, `${question.id}.wav`), text: question.prompt }))
-  .filter((job) => force || !existsSync(job.path));
+  .filter((job) => force || voiceChanged || !existsSync(job.path));
 
 if (jobs.length === 0) {
-  console.log(`audio up to date: ${questions.length} files in ${outDir}`);
+  console.log(`audio up to date: ${questions.length} files (${engine} ${voice}) in ${outDir}`);
 } else {
   const jobFile = join(tmpdir(), `opic-audio-jobs-${Date.now()}.json`);
-  const scriptFile = join(tmpdir(), `opic-audio-${Date.now()}.ps1`);
   writeFileSync(jobFile, JSON.stringify(jobs), "utf8");
-  writeFileSync(scriptFile, POWERSHELL_SCRIPT, "utf8");
-  const voice = execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptFile, jobFile], { encoding: "utf8" });
-  console.log(`generated ${jobs.length} of ${questions.length} files with voice ${voice.trim()} in ${outDir}`);
+  const used = synthesize(jobFile);
+  writeFileSync(manifestPath, JSON.stringify(wanted), "utf8");
+  console.log(`generated ${jobs.length} of ${questions.length} files with ${used} in ${outDir}`);
 }

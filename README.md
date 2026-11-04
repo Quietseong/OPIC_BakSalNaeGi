@@ -4,15 +4,32 @@
 
 ## 실행
 
-Node 20.18 이상과 Windows 영어 음성(기본 설치된 Microsoft Zira)이 필요합니다.
+Node 20.18 이상이 필요합니다.
 
 ```bash
 npm install
-npm run audio   # 질문 음성 WAV 생성 (public/audio, git 제외). 이미 있으면 건너뜀. 다시 만들려면 -- --force
-npm run dev     # http://localhost:5173 을 Chrome 또는 Edge로 연다
+npm run tts:setup   # (권장, 한 번만) 자연스러운 음성 엔진 Kokoro 설치. .tts/ 에 Python 환경과 모델 약 350MB
+npm run audio       # 질문 음성 WAV 생성 (public/audio, git 제외). 바뀐 것만 다시 만든다
+npm run dev         # http://localhost:5173 을 Chrome 또는 Edge로 연다
 ```
 
 질문 음성은 생성된 WAV, 브라우저 음성 합성, 질문 텍스트 순서로 시도합니다. 마이크는 localhost에서만 동작합니다.
+
+### 질문 목소리 바꾸기
+
+| 엔진 | 설치 | 음질 | 라이선스 |
+| --- | --- | --- | --- |
+| Kokoro-82M (기본) | `npm run tts:setup` | 자연스러움 | Apache-2.0 모델, 오프라인 |
+| Windows 음성 (Zira) | 기본 설치 | 기계음 | Windows 내장 |
+
+```bash
+npm run audio -- --voice=bf_emma          # 영국 여성
+npm run audio -- --voice=am_michael       # 미국 남성
+npm run audio -- --speed=0.85             # 더 천천히 (기본 0.95)
+npm run audio -- --engine=windows         # Windows 음성으로 되돌리기
+```
+
+목소리나 속도를 바꾸면 모든 파일을 자동으로 다시 만듭니다(`public/audio/manifest.json`으로 판단). 미국 여성 af_heart, af_bella, 미국 남성 am_michael, am_adam, 영국 여성 bf_emma, 영국 남성 bm_george 등을 쓸 수 있습니다. 167문항 생성에 CPU에서 15~20분쯤 걸립니다.
 
 ## 모드
 
