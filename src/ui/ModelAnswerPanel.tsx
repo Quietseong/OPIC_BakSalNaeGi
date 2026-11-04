@@ -19,7 +19,7 @@ export function ModelAnswerPanel({ questionId, isOpen = false }: Props) {
     try {
       await speak(answer.text);
     } catch (error) {
-      setProblem(errorMessage(error));
+      setProblem(`${errorMessage(error)} 모범 답안 음성 파일(npm run audio:models)이 만들어지면 새로고침해서 들으세요.`);
     }
   }
 
