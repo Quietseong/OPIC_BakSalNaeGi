@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { PRACTICE_SET_A } from "../domain/question-sets";
+import { generatePlan } from "../domain/generate";
+import { QUESTION_POOL } from "../domain/question-pool-data";
 import { createSession } from "../domain/session";
 import { PracticeStore } from "../storage/db";
 import { errorMessage } from "./format";
@@ -31,7 +32,8 @@ export function App() {
 
   async function start(settings: SessionSettings) {
     if (!store) return;
-    const session = createSession(PRACTICE_SET_A, settings, { id: crypto.randomUUID(), now: Date.now() });
+    const plan = generatePlan(QUESTION_POOL, settings, Math.random);
+    const session = createSession(plan, settings, { id: crypto.randomUUID(), now: Date.now(), poolVersion: QUESTION_POOL.version });
     try {
       await store.saveSession(session);
       setView({ kind: "run", sessionId: session.id });

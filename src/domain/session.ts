@@ -1,5 +1,8 @@
+import { practiceDifficulty } from "./generate";
 import { rulesFor } from "./types";
-import type { Difficulty, QuestionSet, Session, SessionSettings } from "./types";
+
+import type { ExamPlan } from "./generate";
+import type { Difficulty, Session, SessionSettings } from "./types";
 
 export type SessionStage =
   | { kind: "question"; questionId: string; number: number }
@@ -7,24 +10,28 @@ export type SessionStage =
   | { kind: "completed" };
 
 export function createSession(
-  set: QuestionSet,
+  plan: ExamPlan,
   settings: SessionSettings,
-  options: { id: string; now: number },
+  options: { id: string; now: number; poolVersion: number },
 ): Session {
-  const firstIds = set.firstSession.map((question) => question.id);
   const branchesLater = rulesFor(settings.mode).askDifficultyAfterFirstSession;
-  const secondIds = branchesLater ? [] : set.secondSession.similar.map((question) => question.id);
+  const difficulty = branchesLater ? null : practiceDifficulty(settings.selfAssessment);
   return {
     id: options.id,
-    setId: set.id,
-    setVersion: set.version,
+    poolVersion: options.poolVersion,
     settings,
     startedAt: options.now,
-    questionIds: [...firstIds, ...secondIds],
+    questionIds: difficulty === null ? plan.first : [...plan.first, ...plan.second[difficulty]],
+    secondSession: plan.second,
     currentIndex: 0,
-    difficulty: branchesLater ? null : "similar",
+    difficulty,
     status: "in-progress",
   };
+}
+
+export function firstSessionLength(session: Session): number {
+  const secondLength = session.difficulty === null ? 0 : session.secondSession[session.difficulty].length;
+  return session.questionIds.length - secondLength;
 }
 
 export function stageOf(session: Session): SessionStage {
@@ -37,10 +44,9 @@ export function stageOf(session: Session): SessionStage {
   return { kind: "completed" };
 }
 
-export function chooseDifficulty(session: Session, set: QuestionSet, difficulty: Difficulty): Session {
+export function chooseDifficulty(session: Session, difficulty: Difficulty): Session {
   if (stageOf(session).kind !== "choose-difficulty") return session;
-  const secondIds = set.secondSession[difficulty].map((question) => question.id);
-  return { ...session, difficulty, questionIds: [...session.questionIds, ...secondIds] };
+  return { ...session, difficulty, questionIds: [...session.questionIds, ...session.secondSession[difficulty]] };
 }
 
 export function advance(session: Session): Session {

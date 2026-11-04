@@ -17,6 +17,38 @@ export type Question = {
   prompt: string;
 };
 
+export type Topic = {
+  id: string;
+  name: string;
+  descriptions: Question[];
+  routines: Question[];
+  changes: Question[];
+  experiences: Question[];
+};
+
+export type Roleplay = {
+  id: string;
+  name: string;
+  ask: Question;
+  solve: Question;
+  experience: Question;
+};
+
+export type AdvancedTopic = {
+  id: string;
+  name: string;
+  comparison: Question;
+  issue: Question;
+};
+
+export type QuestionPool = {
+  version: number;
+  intros: Question[];
+  topics: Topic[];
+  roleplays: Roleplay[];
+  advanced: AdvancedTopic[];
+};
+
 export type Difficulty = "easier" | "similar" | "harder";
 
 export const DIFFICULTIES: readonly Difficulty[] = ["easier", "similar", "harder"];
@@ -33,9 +65,13 @@ export type Mode = "practice" | "exam";
 
 export type PracticeTargetSec = 90 | 120 | null;
 
+export type SelfAssessment = 1 | 2 | 3 | 4 | 5 | 6;
+
 export type SessionSettings = {
   mode: Mode;
   practiceTargetSec: PracticeTargetSec;
+  topicIds: string[];
+  selfAssessment: SelfAssessment;
 };
 
 export type ModeRules = {
@@ -68,11 +104,11 @@ export type SessionStatus = "in-progress" | "completed";
 
 export type Session = {
   id: string;
-  setId: string;
-  setVersion: number;
+  poolVersion: number;
   settings: SessionSettings;
   startedAt: number;
   questionIds: string[];
+  secondSession: Record<Difficulty, string[]>;
   currentIndex: number;
   difficulty: Difficulty | null;
   status: SessionStatus;

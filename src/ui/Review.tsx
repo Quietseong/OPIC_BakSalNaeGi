@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { findQuestion, findSet } from "../domain/question-sets";
+import { findQuestion } from "../domain/questions";
 import { rulesFor } from "../domain/types";
 import { nextAttemptNo } from "../storage/db";
 import { errorMessage, formatDate, formatDuration } from "./format";
@@ -39,9 +39,8 @@ export function Review({ store, sessionId, onHome }: Props) {
 
   useEffect(() => void reload(), [reload]);
 
-  const set = session ? findSet(session.setId) : undefined;
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!session || !set) return <p role="status">불러오는 중…</p>;
+  if (!session) return <p role="status">불러오는 중…</p>;
 
   async function deleteSession() {
     if (!window.confirm("이 연습 기록과 녹음을 모두 삭제할까요? 되돌릴 수 없습니다.")) return;
@@ -50,13 +49,13 @@ export function Review({ store, sessionId, onHome }: Props) {
   }
 
   const questions = session.questionIds
-    .map((id) => findQuestion(set, id))
+    .map((id) => findQuestion(id))
     .filter((question): question is Question => question !== undefined);
 
   return (
     <main>
       <header className="run-header">
-        <h1>복기 · {set.title}</h1>
+        <h1>복기</h1>
         <button type="button" onClick={onHome}>처음으로</button>
       </header>
       <p className="muted">

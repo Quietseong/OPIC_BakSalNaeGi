@@ -1,3 +1,5 @@
+import { PRACTICE_SET_A } from "../domain/question-sets";
+
 import type { Attempt, Session } from "../domain/types";
 
 const DB_NAME = "opic-practice";
@@ -34,6 +36,23 @@ function upgrade(db: IDBDatabase): void {
   const attempts = db.createObjectStore(ATTEMPTS, { keyPath: "id" });
   attempts.createIndex(BY_SESSION, "sessionId");
   db.createObjectStore(RECORDINGS);
+}
+
+const LEGACY_SECOND_SESSION = {
+  easier: PRACTICE_SET_A.secondSession.easier.map((question) => question.id),
+  similar: PRACTICE_SET_A.secondSession.similar.map((question) => question.id),
+  harder: PRACTICE_SET_A.secondSession.harder.map((question) => question.id),
+};
+
+// Sessions saved before the question pool existed lack the survey and second-session plan.
+function normalizeSession(stored: Session | undefined): Session | undefined {
+  if (!stored || stored.secondSession) return stored;
+  return {
+    ...stored,
+    poolVersion: 0,
+    secondSession: LEGACY_SECOND_SESSION,
+    settings: { ...stored.settings, topicIds: stored.settings.topicIds ?? [], selfAssessment: stored.settings.selfAssessment ?? 3 },
+  };
 }
 
 export class PracticeStore {
@@ -82,13 +101,13 @@ export class PracticeStore {
     return this.write("saveSession", [SESSIONS], (tx) => tx.objectStore(SESSIONS).put(session));
   }
 
-  getSession(id: string): Promise<Session | undefined> {
-    return this.read("getSession", SESSIONS, (s) => s.get(id));
+  async getSession(id: string): Promise<Session | undefined> {
+    return normalizeSession(await this.read<Session | undefined>("getSession", SESSIONS, (s) => s.get(id)));
   }
 
   async listSessions(): Promise<Session[]> {
     const sessions = await this.read<Session[]>("listSessions", SESSIONS, (s) => s.getAll());
-    return sessions.sort((a, b) => b.startedAt - a.startedAt);
+    return sessions.map((session) => normalizeSession(session) as Session).sort((a, b) => b.startedAt - a.startedAt);
   }
 
   saveAttempt(attempt: Attempt, recording: Blob): Promise<void> {

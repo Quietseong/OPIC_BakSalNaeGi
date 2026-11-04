@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 
-import { findQuestion, findSet } from "../domain/question-sets";
-import { advance, chooseDifficulty, finish, remainingMs, stageOf } from "../domain/session";
+import { findQuestion } from "../domain/questions";
+import { advance, chooseDifficulty, finish, firstSessionLength, remainingMs, stageOf } from "../domain/session";
 import { DIFFICULTIES, rulesFor } from "../domain/types";
 import { nextAttemptNo } from "../storage/db";
+import { Avatar } from "./Avatar";
 import { errorMessage, formatDuration } from "./format";
+import { QuestionGrid } from "./QuestionGrid";
 import { QuestionStep } from "./QuestionStep";
 
 import type { Recording } from "../media/recorder";
 import type { PracticeStore } from "../storage/db";
-import type { Attempt, Difficulty, QuestionSet, Session } from "../domain/types";
+import type { Attempt, Difficulty, Session } from "../domain/types";
 
 type Props = { store: PracticeStore; sessionId: string; onReview: (sessionId: string) => void; onHome: () => void };
 
@@ -59,9 +61,8 @@ export function Runner({ store, sessionId, onReview, onHome }: Props) {
     if (timeUpOutsideQuestion && session) void persist(finish(session));
   });
 
-  const set = session ? findSet(session.setId) : undefined;
   if (error && !session) return <p className="error" role="alert">{error}</p>;
-  if (!session || !set) return <p role="status">불러오는 중…</p>;
+  if (!session) return <p role="status">불러오는 중…</p>;
 
   async function saveRecording(questionId: string, recording: Recording) {
     const attempt: Attempt = {
@@ -79,33 +80,36 @@ export function Runner({ store, sessionId, onReview, onHome }: Props) {
     setAttempts((current) => [...current, attempt]);
   }
 
-  const mode = session.settings.mode;
   return (
-    <main>
-      <header className="run-header">
-        <h1>{mode === "exam" ? "실전 모드" : "연습 모드"} · {set.title}</h1>
+    <main className="exam">
+      <header className="exam-bar">
+        <h1>{session.settings.mode === "exam" ? "실전 모드" : "연습 모드"}</h1>
         {remaining !== null && session.status === "in-progress" && (
-          <p className="clock" aria-live="off">남은 시간 {formatDuration(remaining)}</p>
+          <p className="exam-clock" aria-live="off">남은 시간 {formatDuration(remaining)}</p>
         )}
         <button type="button" onClick={onHome}>나가기 (진행 상태는 저장됨)</button>
       </header>
       {error && <p className="error" role="alert">{error}</p>}
-      <Stage
-        session={session}
-        set={set}
-        attempts={attempts}
-        timeUp={remaining === 0}
-        onSaveRecording={saveRecording}
-        onPersist={persist}
-        onReview={() => onReview(sessionId)}
-      />
+      <div className="exam-layout">
+        <aside className="exam-side">
+          <Avatar />
+          <QuestionGrid session={session} answeredIds={new Set(attempts.map((attempt) => attempt.questionId))} />
+        </aside>
+        <Stage
+          session={session}
+          attempts={attempts}
+          timeUp={remaining === 0}
+          onSaveRecording={saveRecording}
+          onPersist={persist}
+          onReview={() => onReview(sessionId)}
+        />
+      </div>
     </main>
   );
 }
 
 type StageProps = {
   session: Session;
-  set: QuestionSet;
   attempts: Attempt[];
   timeUp: boolean;
   onSaveRecording: (questionId: string, recording: Recording) => Promise<void>;
@@ -113,11 +117,11 @@ type StageProps = {
   onReview: () => void;
 };
 
-function Stage({ session, set, attempts, timeUp, onSaveRecording, onPersist, onReview }: StageProps) {
+function Stage({ session, attempts, timeUp, onSaveRecording, onPersist, onReview }: StageProps) {
   const stage = stageOf(session);
   if (stage.kind === "completed") {
     return (
-      <section className="card">
+      <section className="card exam-main">
         <h2>모든 문항을 마쳤습니다</h2>
         <p>녹음은 이 브라우저에 저장되었습니다. 복기 화면에서 다시 듣고 메모를 남길 수 있습니다.</p>
         <button type="button" className="primary" onClick={onReview}>복기하기</button>
@@ -125,12 +129,12 @@ function Stage({ session, set, attempts, timeUp, onSaveRecording, onPersist, onR
     );
   }
   if (stage.kind === "choose-difficulty") {
-    return <DifficultyChoice onChoose={(difficulty) => onPersist(chooseDifficulty(session, set, difficulty))} />;
+    return <DifficultyChoice onChoose={(difficulty) => onPersist(chooseDifficulty(session, difficulty))} />;
   }
-  const question = findQuestion(set, stage.questionId);
+  const question = findQuestion(stage.questionId);
   if (!question) return <p className="error" role="alert">문항을 찾을 수 없습니다: {stage.questionId}</p>;
   const rules = rulesFor(session.settings.mode);
-  const part = stage.number <= set.firstSession.length ? "1차" : "2차";
+  const part = stage.number <= firstSessionLength(session) ? "1차" : "2차";
   return (
     <QuestionStep
       key={question.id}
@@ -149,9 +153,9 @@ function Stage({ session, set, attempts, timeUp, onSaveRecording, onPersist, onR
 
 function DifficultyChoice({ onChoose }: { onChoose: (difficulty: Difficulty) => void }) {
   return (
-    <section className="card">
+    <section className="card exam-main">
       <h2>난이도 재조정</h2>
-      <p>2차 세션의 질문 난이도를 고르세요. 공식 시험처럼 선택에 따라 남은 문항 수가 달라집니다.</p>
+      <p>2차 세션의 질문 난이도를 고르세요. 선택에 따라 남은 문항 수가 달라집니다(쉬운 5 · 비슷한 7 · 어려운 8).</p>
       <div className="actions">
         {DIFFICULTIES.map((difficulty) => (
           <button type="button" key={difficulty} onClick={() => onChoose(difficulty)}>

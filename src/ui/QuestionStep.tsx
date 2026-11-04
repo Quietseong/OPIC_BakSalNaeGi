@@ -4,6 +4,7 @@ import { INITIAL_RUNNER_STATE, canAdvance, canListen, canRecord, runnerReducer }
 import { requestMic, startRecording } from "../media/recorder";
 import { playQuestion, stopSpeaking } from "../media/speech";
 import { errorMessage, formatDuration } from "./format";
+import { LevelMeter } from "./LevelMeter";
 
 import type { RunnerRules, RunnerState } from "../domain/runner";
 import type { Recording, RecordingHandle } from "../media/recorder";
@@ -54,6 +55,7 @@ export function QuestionStep(props: Props) {
     initialState(props.alreadySaved, rules.maxListens),
   );
   const [problem, setProblem] = useState<string | null>(null);
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
   const handleRef = useRef<RecordingHandle | null>(null);
   const pendingRef = useRef<Recording | null>(null);
   const elapsed = useElapsed(state.kind === "recording");
@@ -105,6 +107,7 @@ export function QuestionStep(props: Props) {
         return;
       }
       handleRef.current = startRecording(stream);
+      setLiveStream(stream);
     } catch (error) {
       setProblem(errorMessage(error));
       dispatchRaw({ type: "RECORD_FAILED" });
@@ -115,6 +118,7 @@ export function QuestionStep(props: Props) {
     const handle = handleRef.current;
     if (!handle) return;
     handleRef.current = null;
+    setLiveStream(null);
     dispatchRaw({ type: "STOP" });
     try {
       const recording = await handle.stop();
@@ -149,31 +153,46 @@ export function QuestionStep(props: Props) {
   const listensLabel = rules.maxListens === null ? `${state.listens}회` : `${state.listens}/${rules.maxListens}`;
 
   return (
-    <section className="card" aria-labelledby="question-heading">
+    <section className="card exam-main" aria-labelledby="question-heading">
       <h2 id="question-heading">{props.heading}</h2>
       <p className="topic">주제: {question.topic}</p>
-      {showPrompt ? <p className="prompt" lang="en">{question.prompt}</p> : <p className="prompt muted">질문을 듣고 답하세요.</p>}
-      <div className="actions">
-        <button type="button" onClick={handlePlay} disabled={!canListen(state, rules)}>
+      <div className="exam-controls">
+        <button
+          type="button"
+          className={`play-button${state.kind === "playing" ? " is-playing" : ""}`}
+          onClick={handlePlay}
+          disabled={!canListen(state, rules)}
+        >
+          <span aria-hidden="true" className="play-icon">{state.kind === "playing" ? "♪" : "▶"}</span>
           질문 듣기 ({listensLabel})
         </button>
-        {state.kind === "recording" ? (
-          <button type="button" className="danger" onClick={handleStop}>녹음 정지</button>
-        ) : (
-          <button type="button" className="primary" onClick={handleRecord} disabled={!canRecord(state)}>녹음 시작</button>
-        )}
+        <div className={`record-panel${state.kind === "recording" ? " is-recording" : ""}`}>
+          {state.kind === "recording" ? (
+            <button type="button" className="danger record-button" onClick={handleStop}>
+              <span aria-hidden="true" className="rec-dot" />녹음 정지
+            </button>
+          ) : (
+            <button type="button" className="primary record-button" onClick={handleRecord} disabled={!canRecord(state)}>녹음 시작</button>
+          )}
+          {liveStream && <LevelMeter stream={liveStream} />}
+          {state.kind === "recording" && <RecordingClock elapsed={elapsed} targetSec={props.practiceTargetSec} />}
+        </div>
+      </div>
+      {showPrompt ? <p className="prompt" lang="en">{question.prompt}</p> : <p className="prompt muted">질문을 듣고 답하세요.</p>}
+      <p className="status" role="status" aria-live="polite" data-state={state.kind}>{STATUS_TEXT[state.kind]}</p>
+      {state.kind === "save-failed" && <p className="error" role="alert">{state.message}</p>}
+      {problem && <p className="error" role="alert">{problem}</p>}
+      <div className="actions exam-footer">
         {state.kind === "save-failed" && <button type="button" onClick={handleRetry}>저장 다시 시도</button>}
         {state.kind === "saved" && rules.allowRerecord && (
           <button type="button" onClick={() => dispatchRaw({ type: "RERECORD" })}>다시 녹음</button>
         )}
         {props.onNext && (
-          <button type="button" className="primary" onClick={props.onNext} disabled={!canAdvance(state)}>다음 문항</button>
+          <button type="button" className="primary next-button" onClick={props.onNext} disabled={!canAdvance(state)}>
+            다음 문항 <span aria-hidden="true">›</span>
+          </button>
         )}
       </div>
-      {state.kind === "recording" && <RecordingClock elapsed={elapsed} targetSec={props.practiceTargetSec} />}
-      <p className="status" role="status" aria-live="polite" data-state={state.kind}>{STATUS_TEXT[state.kind]}</p>
-      {state.kind === "save-failed" && <p className="error" role="alert">{state.message}</p>}
-      {problem && <p className="error" role="alert">{problem}</p>}
     </section>
   );
 }

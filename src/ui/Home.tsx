@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 
+import { MIN_SURVEY_TOPICS } from "../domain/generate";
 import { errorMessage, formatDate } from "./format";
+import { SurveyFields } from "./SurveyFields";
 
 import type { PracticeStore } from "../storage/db";
-import type { Mode, PracticeTargetSec, Session, SessionSettings } from "../domain/types";
+import type { Mode, PracticeTargetSec, SelfAssessment, Session, SessionSettings } from "../domain/types";
 
 type Props = {
   store: PracticeStore;
@@ -24,6 +26,9 @@ function usePersistence(): string {
 export function Home({ store, onStart, onResume, onReview }: Props) {
   const [mode, setMode] = useState<Mode>("practice");
   const [target, setTarget] = useState<PracticeTargetSec>(120);
+  const [topicIds, setTopicIds] = useState<string[]>([]);
+  const [selfAssessment, setSelfAssessment] = useState<SelfAssessment>(3);
+  const hasEnoughTopics = topicIds.length >= MIN_SURVEY_TOPICS;
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const persistence = usePersistence();
@@ -39,14 +44,15 @@ export function Home({ store, onStart, onResume, onReview }: Props) {
         className="card"
         onSubmit={(event) => {
           event.preventDefault();
-          onStart({ mode, practiceTargetSec: mode === "practice" ? target : null });
+          if (!hasEnoughTopics) return;
+          onStart({ mode, practiceTargetSec: mode === "practice" ? target : null, topicIds, selfAssessment });
         }}
       >
         <fieldset>
           <legend>모드</legend>
           <label>
             <input type="radio" name="mode" checked={mode === "practice"} onChange={() => setMode("practice")} />
-            연습 모드 · 질문 텍스트 표시, 다시 듣기 제한 없음, 다시 녹음 가능, 15문항
+            연습 모드 · 질문 텍스트 표시, 다시 듣기 제한 없음, 다시 녹음 가능, 수준에 따라 12~15문항
           </label>
           <label>
             <input type="radio" name="mode" checked={mode === "exam"} onChange={() => setMode("exam")} />
@@ -69,7 +75,15 @@ export function Home({ store, onStart, onResume, onReview }: Props) {
             앱 자체 규칙: 다시 듣기는 녹음 전에만 가능, 이전 문항으로 돌아갈 수 없음, 40분이 지나면 녹음 중인 답변을 저장하고 종료.
           </p>
         )}
-        <button type="submit" className="primary">마이크 점검 후 시작</button>
+        <SurveyFields
+          topicIds={topicIds}
+          selfAssessment={selfAssessment}
+          onTopicsChange={setTopicIds}
+          onSelfAssessmentChange={setSelfAssessment}
+        />
+        <p className="muted">문항은 매번 주제별 문항 풀에서 새로 조합됩니다.</p>
+        <button type="submit" className="primary" disabled={!hasEnoughTopics}>마이크 점검 후 시작</button>
+        {!hasEnoughTopics && <p className="muted" role="status">관심 주제를 {MIN_SURVEY_TOPICS}개 이상 고르면 시작할 수 있습니다.</p>}
       </form>
       <p className="muted">
         녹음은 이 브라우저에만 저장됩니다. 저장소 보호: {persistence}. 브라우저 데이터를 지우면 녹음도 사라지므로 복기 화면에서 내보내 두세요.

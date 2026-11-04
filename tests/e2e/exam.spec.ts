@@ -10,10 +10,10 @@ test("exam: two listens, hidden prompt, difficulty branch after question 7, 12 q
 
   const listen = page.getByRole("button", { name: /질문 듣기/ });
   await listen.click();
-  await expect(listen).toHaveText("질문 듣기 (1/2)");
+  await expect(listen).toHaveAccessibleName("질문 듣기 (1/2)");
   await expect(listen).toBeEnabled();
   await listen.click();
-  await expect(listen).toHaveText("질문 듣기 (2/2)");
+  await expect(listen).toHaveAccessibleName("질문 듣기 (2/2)");
   await expect(page.getByRole("button", { name: "녹음 시작" })).toBeEnabled();
   await expect(listen).toBeDisabled();
   await expect(page.getByRole("button", { name: "다음 문항" })).toBeDisabled();
@@ -50,7 +50,7 @@ test("exam: when speech fails the prompt text appears and the answer can still b
   await startSession(page, "exam");
   await page.getByRole("button", { name: /질문 듣기/ }).click();
   await expect(page.getByRole("alert")).toContainText("질문 텍스트를 보고 답변하세요");
-  await expect(page.locator(".prompt[lang=en]")).toContainText("introduce yourself");
+  await expect(page.locator(".prompt[lang=en]")).toContainText(/yourself/i);
   await page.getByRole("button", { name: "녹음 시작" }).click();
   await page.waitForTimeout(800);
   await page.getByRole("button", { name: "녹음 정지" }).click();
@@ -63,6 +63,8 @@ test("errors: a denied microphone is explained and nothing starts", async ({ pag
     navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("denied", "NotAllowedError"));
   });
   await page.goto("/");
+  await page.getByLabel("카페").check();
+  await page.getByLabel("음악").check();
   await page.getByRole("button", { name: "마이크 점검 후 시작" }).click();
   await page.getByRole("button", { name: "3초 테스트 녹음" }).click();
   await expect(page.getByRole("alert")).toContainText("마이크 권한이 거부되었습니다");

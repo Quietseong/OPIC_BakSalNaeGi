@@ -10,13 +10,20 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = join(root, "public", "audio");
 const force = process.argv.includes("--force");
 
-async function loadQuestions() {
-  const source = readFileSync(join(root, "src", "domain", "question-sets.ts"), "utf8");
-  const { code } = await transformWithEsbuild(source, "question-sets.ts", { format: "esm" });
-  const modulePath = join(tmpdir(), `opic-question-sets-${Date.now()}.mjs`);
+async function loadModule(relativePath) {
+  const source = readFileSync(join(root, relativePath), "utf8");
+  const { code } = await transformWithEsbuild(source, relativePath, { format: "esm" });
+  const modulePath = join(tmpdir(), `opic-${Date.now()}-${relativePath.replace(/[\/]/g, "_")}.mjs`);
   writeFileSync(modulePath, code);
-  const { QUESTION_SETS } = await import(pathToFileURL(modulePath).href);
-  return QUESTION_SETS.flatMap((set) => [...set.firstSession, ...Object.values(set.secondSession).flat()]);
+  return import(pathToFileURL(modulePath).href);
+}
+
+async function loadQuestions() {
+  const { PRACTICE_SET_A } = await loadModule("src/domain/question-sets.ts");
+  const { QUESTION_POOL } = await loadModule("src/domain/question-pool-data.ts");
+  const { allPoolQuestions } = await loadModule("src/domain/generate.ts");
+  const legacy = [...PRACTICE_SET_A.firstSession, ...Object.values(PRACTICE_SET_A.secondSession).flat()];
+  return [...legacy, ...allPoolQuestions(QUESTION_POOL)];
 }
 
 const POWERSHELL_SCRIPT = `

@@ -34,6 +34,8 @@ export async function installSpeechStub(page: Page, mode: SpeechMode = "speaks",
 export async function startSession(page: Page, mode: "practice" | "exam") {
   await page.goto("/");
   await page.getByLabel(mode === "practice" ? /연습 모드/ : /실전 모드/).check();
+  await page.getByLabel("카페").check();
+  await page.getByLabel("음악").check();
   await page.getByRole("button", { name: "마이크 점검 후 시작" }).click();
   await page.getByRole("button", { name: "3초 테스트 녹음" }).click();
   await expect(page.getByRole("button", { name: "연습 시작" })).toBeEnabled({ timeout: 10_000 });

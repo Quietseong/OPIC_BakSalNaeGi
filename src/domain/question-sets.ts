@@ -54,14 +54,3 @@ export const PRACTICE_SET_A: QuestionSet = {
   firstSession,
   secondSession: { easier, similar, harder },
 };
-
-export const QUESTION_SETS: readonly QuestionSet[] = [PRACTICE_SET_A];
-
-export function findSet(setId: string): QuestionSet | undefined {
-  return QUESTION_SETS.find((set) => set.id === setId);
-}
-
-export function findQuestion(set: QuestionSet, questionId: string): Question | undefined {
-  const all = [...set.firstSession, ...Object.values(set.secondSession).flat()];
-  return all.find((question) => question.id === questionId);
-}

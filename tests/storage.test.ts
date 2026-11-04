@@ -1,13 +1,17 @@
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { PRACTICE_SET_A } from "../src/domain/question-sets";
 import { createSession } from "../src/domain/session";
 import { PracticeStore, StorageError, nextAttemptNo } from "../src/storage/db";
 
 import type { Attempt } from "../src/domain/types";
 
-const session = createSession(PRACTICE_SET_A, { mode: "practice", practiceTargetSec: null }, { id: "s1", now: 1 });
+const PLAN = { first: ["intro-1"], second: { easier: ["cafe-d1"], similar: ["cafe-d2"], harder: ["cafe-c1"] } };
+const session = createSession(
+  PLAN,
+  { mode: "practice", practiceTargetSec: null, topicIds: ["cafe", "park"], selfAssessment: 3 },
+  { id: "s1", now: 1, poolVersion: 1 },
+);
 
 function attempt(id: string, questionId: string, attemptNo: number, sessionId = "s1"): Attempt {
   return { id, sessionId, questionId, attemptNo, mimeType: "audio/webm", durationMs: 2000, sizeBytes: 3, createdAt: attemptNo, note: "" };
@@ -75,6 +79,14 @@ describe("PracticeStore", () => {
     Object.defineProperty(unclonable, "fn", { value: () => undefined, enumerable: true });
     await expect(store.saveAttempt(attempt("a1", "a-01", 1), unclonable)).rejects.toBeInstanceOf(StorageError);
     expect(await store.listAttempts("s1")).toEqual([]);
+  });
+
+  it("should_read_a_session_saved_before_the_question_pool_with_set_a_branches", async () => {
+    const legacy = { id: "old", setId: "set-a", setVersion: 1, settings: { mode: "exam", practiceTargetSec: null }, startedAt: 1, questionIds: ["a-01"], currentIndex: 0, difficulty: null, status: "in-progress" };
+    await store.saveSession(legacy as unknown as typeof session);
+    const loaded = await store.getSession("old");
+    expect(loaded?.secondSession.easier[0]).toBe("a-e08");
+    expect(loaded?.settings.selfAssessment).toBe(3);
   });
 
   it("should_raise_a_storage_error_when_the_database_is_closed", async () => {
