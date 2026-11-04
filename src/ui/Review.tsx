@@ -132,7 +132,7 @@ function ReviewItem({ store, sessionId, question, attempts, allAttempts, onChang
         <QuestionStep
           question={question}
           heading="다시 답변"
-          rules={{ ...rulesFor("practice"), allowRerecord: true }}
+          rules={{ ...rulesFor("practice"), allowRerecord: true, allowPause: false }}
           practiceTargetSec={null}
           alreadySaved={false}
           onSave={saveAgain}

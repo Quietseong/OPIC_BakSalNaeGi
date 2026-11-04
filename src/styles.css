@@ -104,3 +104,4 @@ main.exam { max-width: 1040px; }
 .field-hint { font-size: 0.85rem; }
 .revision-ref { padding: 8px 12px; border-left: 4px solid var(--primary); background: var(--bg); }
 h3 { font-size: 1rem; margin: 16px 0 4px; }
+.record-row { display: flex; gap: 8px; flex-wrap: wrap; } .record-row .record-button { flex: 1; }

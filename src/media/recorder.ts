@@ -36,13 +36,18 @@ export async function requestMic(): Promise<MediaStream> {
 
 export type Recording = { blob: Blob; durationMs: number; mimeType: string };
 
-export type RecordingHandle = { stop(): Promise<Recording> };
+export type RecordingHandle = { pause(): void; resume(): void; stop(): Promise<Recording> };
 
 // MediaRecorder WebM files report an Infinity duration, so the length is measured here.
 export function startRecording(stream: MediaStream): RecordingHandle {
   const recorder = new MediaRecorder(stream, { mimeType: pickMimeType() });
   const chunks: Blob[] = [];
-  const startedAt = performance.now();
+  let activeMs = 0;
+  let segmentStart: number | null = performance.now();
+  const closeSegment = () => {
+    if (segmentStart !== null) activeMs += performance.now() - segmentStart;
+    segmentStart = null;
+  };
   recorder.ondataavailable = (event) => {
     if (event.data.size > 0) chunks.push(event.data);
   };
@@ -51,12 +56,23 @@ export function startRecording(stream: MediaStream): RecordingHandle {
       stream.getTracks().forEach((track) => track.stop());
       const blob = new Blob(chunks, { type: recorder.mimeType });
       if (blob.size === 0) reject(new Error("녹음된 소리가 없습니다."));
-      else resolve({ blob, durationMs: Math.round(performance.now() - startedAt), mimeType: recorder.mimeType });
+      else resolve({ blob, durationMs: Math.round(activeMs), mimeType: recorder.mimeType });
     };
   });
   recorder.start(250);
   return {
+    pause() {
+      if (recorder.state !== "recording") return;
+      closeSegment();
+      recorder.pause();
+    },
+    resume() {
+      if (recorder.state !== "paused") return;
+      segmentStart = performance.now();
+      recorder.resume();
+    },
     stop() {
+      closeSegment();
       if (recorder.state !== "inactive") recorder.stop();
       return stopped;
     },

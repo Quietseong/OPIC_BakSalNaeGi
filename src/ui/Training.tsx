@@ -31,7 +31,7 @@ function randomQuestionId(exceptId?: string): string {
   return candidates[Math.floor(Math.random() * candidates.length)]?.id ?? POOL[0]?.id ?? "";
 }
 
-const PRACTICE_RULES = { maxListens: null, showPromptText: true, allowRerecord: false };
+const TRAINING_RULES = { maxListens: null, showPromptText: true, allowRerecord: false, allowPause: true };
 
 export function Training({ store, start, onHome }: Props) {
   const [stage, setStage] = useState<Stage | null>(() =>
@@ -121,7 +121,7 @@ function RoundStep({ store, question, record, round, onStage }: RoundProps) {
       key={`${record.id}-${round}`}
       question={question}
       heading={`${round + 1}라운드 · 제한 ${limit}초`}
-      rules={PRACTICE_RULES}
+      rules={TRAINING_RULES}
       practiceTargetSec={null}
       hardLimitSec={limit}
       showCoaching

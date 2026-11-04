@@ -1,6 +1,7 @@
 export type RunnerRules = {
   maxListens: number | null;
   allowRerecord: boolean;
+  allowPause: boolean;
 };
 
 export type RunnerState =
@@ -8,6 +9,7 @@ export type RunnerState =
   | { kind: "playing"; listens: number }
   | { kind: "answerable"; listens: number; playbackFailed: boolean }
   | { kind: "recording"; listens: number }
+  | { kind: "paused"; listens: number }
   | { kind: "saving"; listens: number }
   | { kind: "saved"; listens: number }
   | { kind: "save-failed"; listens: number; message: string };
@@ -18,6 +20,8 @@ export type RunnerEvent =
   | { type: "PLAY_FAILED" }
   | { type: "RECORD" }
   | { type: "RECORD_FAILED" }
+  | { type: "PAUSE" }
+  | { type: "RESUME" }
   | { type: "STOP" }
   | { type: "SAVE_OK" }
   | { type: "SAVE_FAILED"; message: string }
@@ -33,6 +37,14 @@ export function canListen(state: RunnerState, rules: RunnerRules): boolean {
 
 export function canRecord(state: RunnerState): boolean {
   return state.kind === "answerable";
+}
+
+export function canPause(state: RunnerState, rules: RunnerRules): boolean {
+  return state.kind === "recording" && rules.allowPause;
+}
+
+export function isCapturing(state: RunnerState): boolean {
+  return state.kind === "recording" || state.kind === "paused";
 }
 
 export function canAdvance(state: RunnerState): boolean {
@@ -52,8 +64,12 @@ export function runnerReducer(state: RunnerState, event: RunnerEvent, rules: Run
       return canRecord(state) ? { kind: "recording", listens } : state;
     case "RECORD_FAILED":
       return state.kind === "recording" ? { kind: "answerable", listens, playbackFailed: false } : state;
+    case "PAUSE":
+      return canPause(state, rules) ? { kind: "paused", listens } : state;
+    case "RESUME":
+      return state.kind === "paused" ? { kind: "recording", listens } : state;
     case "STOP":
-      return state.kind === "recording" ? { kind: "saving", listens } : state;
+      return isCapturing(state) ? { kind: "saving", listens } : state;
     case "SAVE_OK":
       return state.kind === "saving" ? { kind: "saved", listens } : state;
     case "SAVE_FAILED":

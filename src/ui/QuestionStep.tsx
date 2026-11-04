@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
-import { INITIAL_RUNNER_STATE, canAdvance, canListen, canRecord, runnerReducer } from "../domain/runner";
+import { INITIAL_RUNNER_STATE, canAdvance, canListen, canPause, canRecord, isCapturing, runnerReducer } from "../domain/runner";
 import { requestMic, startRecording } from "../media/recorder";
 import { playQuestion, stopSpeaking } from "../media/speech";
 import { errorMessage, formatDuration } from "./format";
@@ -31,6 +31,7 @@ const STATUS_TEXT: Record<RunnerState["kind"], string> = {
   playing: "질문을 재생하고 있습니다.",
   answerable: "준비되면 녹음 시작을 누르세요.",
   recording: "녹음 중입니다.",
+  paused: "일시정지했습니다. 생각을 정리한 뒤 이어서 녹음하세요.",
   saving: "답변을 저장하고 있습니다.",
   saved: "답변이 저장되었습니다.",
   "save-failed": "답변을 저장하지 못했습니다.",
@@ -40,15 +41,23 @@ function initialState(alreadySaved: boolean, maxListens: number | null): RunnerS
   return alreadySaved ? { kind: "saved", listens: maxListens ?? 0 } : INITIAL_RUNNER_STATE;
 }
 
-function useElapsed(active: boolean): number {
+// Counts only recording time: paused stretches are excluded, and a new capture starts from zero.
+function useRecordingElapsed(kind: RunnerState["kind"]): number {
   const [elapsed, setElapsed] = useState(0);
+  const banked = useRef(0);
+  const isCapturing = kind === "recording" || kind === "paused";
   useEffect(() => {
-    if (!active) return;
+    if (!isCapturing) banked.current = 0;
+    if (kind !== "recording") return;
     const startedAt = Date.now();
-    setElapsed(0);
-    const timer = setInterval(() => setElapsed(Date.now() - startedAt), 250);
-    return () => clearInterval(timer);
-  }, [active]);
+    const base = banked.current;
+    setElapsed(base);
+    const timer = setInterval(() => setElapsed(base + Date.now() - startedAt), 250);
+    return () => {
+      clearInterval(timer);
+      banked.current = base + Date.now() - startedAt;
+    };
+  }, [kind, isCapturing]);
   return elapsed;
 }
 
@@ -60,9 +69,10 @@ export function QuestionStep(props: Props) {
   );
   const [problem, setProblem] = useState<string | null>(null);
   const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const handleRef = useRef<RecordingHandle | null>(null);
   const pendingRef = useRef<Recording | null>(null);
-  const elapsed = useElapsed(state.kind === "recording");
+  const elapsed = useRecordingElapsed(state.kind);
   const mountedRef = useRef(true);
   const onSaveRef = useRef(props.onSave);
   onSaveRef.current = props.onSave;
@@ -111,6 +121,7 @@ export function QuestionStep(props: Props) {
         return;
       }
       handleRef.current = startRecording(stream);
+      streamRef.current = stream;
       setLiveStream(stream);
     } catch (error) {
       setProblem(errorMessage(error));
@@ -133,6 +144,20 @@ export function QuestionStep(props: Props) {
     }
   }
 
+  function handlePause() {
+    if (!handleRef.current || !canPause(state, rules)) return;
+    handleRef.current.pause();
+    setLiveStream(null);
+    dispatchRaw({ type: "PAUSE" });
+  }
+
+  function handleResume() {
+    if (!handleRef.current) return;
+    handleRef.current.resume();
+    setLiveStream(streamRef.current);
+    dispatchRaw({ type: "RESUME" });
+  }
+
   async function handleRetry() {
     const recording = pendingRef.current;
     if (!recording) return;
@@ -149,7 +174,7 @@ export function QuestionStep(props: Props) {
   useEffect(() => {
     if (!props.timeUp || timeUpHandledRef.current) return;
     stopSpeaking();
-    if (state.kind === "recording") {
+    if (isCapturing(state)) {
       void handleStop();
       return;
     }
@@ -176,15 +201,23 @@ export function QuestionStep(props: Props) {
           질문 듣기 ({listensLabel})
         </button>
         <div className={`record-panel${state.kind === "recording" ? " is-recording" : ""}`}>
-          {state.kind === "recording" ? (
-            <button type="button" className="danger record-button" onClick={handleStop}>
-              <span aria-hidden="true" className="rec-dot" />녹음 정지
-            </button>
+          {isCapturing(state) ? (
+            <div className="record-row">
+              <button type="button" className="danger record-button" onClick={handleStop}>
+                {state.kind === "recording" && <span aria-hidden="true" className="rec-dot" />}녹음 정지
+              </button>
+              {state.kind === "recording" && rules.allowPause && (
+                <button type="button" className="record-button" onClick={handlePause}>일시정지</button>
+              )}
+              {state.kind === "paused" && (
+                <button type="button" className="primary record-button" onClick={handleResume}>이어서 녹음</button>
+              )}
+            </div>
           ) : (
             <button type="button" className="primary record-button" onClick={handleRecord} disabled={!canRecord(state)}>녹음 시작</button>
           )}
           {liveStream && <LevelMeter stream={liveStream} />}
-          {state.kind === "recording" && <RecordingClock elapsed={elapsed} targetSec={props.hardLimitSec ?? props.practiceTargetSec} isHardLimit={props.hardLimitSec !== undefined} />}
+          {isCapturing(state) && <RecordingClock elapsed={elapsed} targetSec={props.hardLimitSec ?? props.practiceTargetSec} isHardLimit={props.hardLimitSec !== undefined} />}
         </div>
       </div>
       {showPrompt ? <p className="prompt" lang="en">{question.prompt}</p> : <p className="prompt muted">질문을 듣고 답하세요.</p>}

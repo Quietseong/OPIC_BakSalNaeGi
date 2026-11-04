@@ -9,8 +9,9 @@ import { advance, chooseDifficulty, createSession, firstSessionLength, remaining
 import type { RunnerEvent, RunnerRules, RunnerState } from "../src/domain/runner";
 import type { SelfAssessment, Session } from "../src/domain/types";
 
-const EXAM: RunnerRules = { maxListens: 2, allowRerecord: false };
-const PRACTICE: RunnerRules = { maxListens: null, allowRerecord: true };
+const EXAM: RunnerRules = { maxListens: 2, allowRerecord: false, allowPause: false };
+const PRACTICE: RunnerRules = { maxListens: null, allowRerecord: true, allowPause: false };
+const TRAINING: RunnerRules = { maxListens: null, allowRerecord: false, allowPause: true };
 
 function run(rules: RunnerRules, ...events: RunnerEvent["type"][]): RunnerState {
   return events.reduce<RunnerState>(
@@ -49,6 +50,17 @@ describe("question runner", () => {
 
   it("should_return_to_answerable_when_the_microphone_fails_to_start", () => {
     expect(run(EXAM, "PLAY", "PLAY_ENDED", "RECORD", "RECORD_FAILED").kind).toBe("answerable");
+  });
+
+  it("should_pause_resume_and_stop_a_training_recording", () => {
+    expect(run(TRAINING, "PLAY", "PLAY_ENDED", "RECORD", "PAUSE").kind).toBe("paused");
+    expect(run(TRAINING, "PLAY", "PLAY_ENDED", "RECORD", "PAUSE", "RESUME").kind).toBe("recording");
+    expect(run(TRAINING, "PLAY", "PLAY_ENDED", "RECORD", "PAUSE", "STOP").kind).toBe("saving");
+  });
+
+  it("should_not_pause_outside_training", () => {
+    expect(run(EXAM, "PLAY", "PLAY_ENDED", "RECORD", "PAUSE").kind).toBe("recording");
+    expect(run(PRACTICE, "PLAY", "PLAY_ENDED", "RECORD", "PAUSE").kind).toBe("recording");
   });
 
   it("should_block_listening_while_recording", () => {

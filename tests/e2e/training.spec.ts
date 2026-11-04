@@ -76,3 +76,26 @@ test("exam mode hides the answer skeleton", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "1차 세션 · 문항 1" })).toBeVisible();
   await expect(page.getByText(/답변 뼈대/)).toHaveCount(0);
 });
+
+test("training: pausing stops the clock, so neither the limit nor the saved length counts the pause", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/");
+  await page.getByRole("button", { name: "새 질문으로 3번 줄여 말하기" }).click();
+  await page.getByRole("button", { name: "훈련 시작" }).click();
+  await page.getByRole("button", { name: /질문 듣기/ }).click();
+  await page.getByRole("button", { name: "녹음 시작" }).click();
+  await expect(page.getByRole("button", { name: "일시정지" })).toBeVisible();
+  await page.waitForTimeout(800);
+  await page.getByRole("button", { name: "일시정지" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "일시정지했습니다" })).toBeVisible();
+  await page.clock.fastForward("02:00");
+  await expect(page.getByRole("status").filter({ hasText: "일시정지했습니다" })).toBeVisible();
+  await page.getByRole("button", { name: "이어서 녹음" }).click();
+  await page.waitForTimeout(800);
+  await page.getByRole("button", { name: "녹음 정지" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "답변이 저장되었습니다." })).toBeVisible();
+  await page.getByRole("button", { name: "다음 라운드" }).click();
+  await page.getByRole("button", { name: "처음으로" }).click();
+  await page.getByRole("button", { name: "결과 보기" }).click();
+  await expect(page.getByText(/1라운드 \(90초\) · 0:0\d/)).toBeVisible();
+});

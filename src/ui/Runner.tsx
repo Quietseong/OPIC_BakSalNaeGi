@@ -134,7 +134,7 @@ function Stage({ session, attempts, timeUp, onSaveRecording, onPersist, onReview
       key={question.id}
       question={question}
       heading={`${part} 세션 · 문항 ${stage.number}`}
-      rules={{ ...rules, allowRerecord: session.settings.mode === "practice" }}
+      rules={{ ...rules, allowRerecord: session.settings.mode === "practice", allowPause: false }}
       practiceTargetSec={session.settings.practiceTargetSec}
       showCoaching={session.settings.mode === "practice"}
       alreadySaved={attempts.some((attempt) => attempt.questionId === question.id)}
