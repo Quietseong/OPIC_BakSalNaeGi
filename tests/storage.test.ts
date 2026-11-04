@@ -136,7 +136,7 @@ describe("database upgrade", () => {
 describe("training and review storage", () => {
   it("should_delete_a_training_with_its_round_recordings", async () => {
     const store = await PracticeStore.open(new IDBFactory());
-    await store.saveTraining({ id: "t1", questionId: "cafe-d1", createdAt: 1, roundLimitsSec: [90, 70, 50] });
+    await store.saveTraining({ id: "t1", questionId: "cafe-d1", createdAt: 1, roundLimitsSec: [90, 70, 50], plan: [] });
     await store.saveAttempt(attempt("r1", "cafe-d1", 1, "t1"), new Blob(["x"]));
     expect((await store.listTrainings()).map((t) => t.id)).toEqual(["t1"]);
     await store.deleteTraining("t1");

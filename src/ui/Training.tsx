@@ -8,9 +8,10 @@ import { findQuestion } from "../domain/questions";
 import { scheduleReview } from "../domain/review-schedule";
 import { newTraining, trainableQuestions } from "../domain/training";
 import { AttemptRow } from "./AttemptRow";
-import { CoachingCard } from "./CoachingCard";
+import { ModelAnswerPanel } from "./ModelAnswerPanel";
 import { errorMessage, formatDate } from "./format";
 import { QuestionStep } from "./QuestionStep";
+import { PlanBox, PlanStep, StudyStep } from "./TrainingPrep";
 
 import type { Recording } from "../media/recorder";
 import type { PracticeStore } from "../storage/db";
@@ -21,6 +22,8 @@ type Props = { store: PracticeStore; start: { questionId: string | null } | { tr
 
 type Stage =
   | { kind: "pick"; questionId: string }
+  | { kind: "study"; record: TrainingRecord }
+  | { kind: "plan"; record: TrainingRecord }
   | { kind: "round"; record: TrainingRecord; round: number }
   | { kind: "result"; record: TrainingRecord };
 
@@ -52,7 +55,17 @@ export function Training({ store, start, onHome }: Props) {
     const record = newTraining(questionId, { id: crypto.randomUUID(), now: Date.now() });
     try {
       await store.saveTraining(record);
-      setStage({ kind: "round", record, round: 0 });
+      setStage({ kind: "study", record });
+    } catch (saveError) {
+      setError(errorMessage(saveError));
+    }
+  }
+
+  async function savePlan(record: TrainingRecord, plan: string[]) {
+    const updated = { ...record, plan };
+    try {
+      await store.saveTraining(updated);
+      setStage({ kind: "round", record: updated, round: 0 });
     } catch (saveError) {
       setError(errorMessage(saveError));
     }
@@ -78,6 +91,9 @@ export function Training({ store, start, onHome }: Props) {
           onBegin={() => void begin(question.id)}
         />
       )}
+      {stage.kind === "study" && <StudyStep question={question} onNext={() => setStage({ kind: "plan", record: stage.record })} />}
+      {stage.kind === "plan" && <PlanStep question={question} onDone={(plan) => void savePlan(stage.record, plan)} />}
+      {stage.kind === "round" && <PlanBox question={question} plan={stage.record.plan} />}
       {stage.kind === "round" && <RoundStep store={store} question={question} record={stage.record} round={stage.round} onStage={setStage} />}
       {stage.kind === "result" && <ResultStep store={store} question={question} record={stage.record} onAgain={() => setStage({ kind: "pick", questionId: randomQuestionId(question.id) })} />}
     </main>
@@ -88,12 +104,11 @@ function PickStep({ question, canShuffle, onShuffle, onBegin }: { question: Ques
   return (
     <section className="card">
       <p className="muted">
-        같은 질문에 90초 → 70초 → 50초 제한으로 세 번 답합니다. 같은 내용을 점점 짧은 시간에, 덜 끊기게 말하는 유창성 훈련입니다.
-        제한 시간이 되면 녹음이 자동으로 멈춥니다.
+        순서: 모범 답안 공부 → 내 키워드 메모 → 같은 질문에 90초·70초·50초 제한으로 세 번 답하기.
+        말할 내용과 첫 문장을 먼저 준비한 뒤, 점점 짧은 시간에 덜 끊기게 말하는 훈련입니다. 녹음 중에는 일시정지할 수 있습니다.
       </p>
       <h2>{question.topic} · {COACHING[question.type].label}</h2>
       <p className="prompt" lang="en">{question.prompt}</p>
-      <CoachingCard type={question.type} />
       <div className="actions">
         {canShuffle && <button type="button" onClick={onShuffle}>다른 질문</button>}
         <button type="button" className="primary" onClick={onBegin}>훈련 시작</button>
@@ -124,7 +139,6 @@ function RoundStep({ store, question, record, round, onStage }: RoundProps) {
       rules={TRAINING_RULES}
       practiceTargetSec={null}
       hardLimitSec={limit}
-      showCoaching
       alreadySaved={false}
       onSave={save}
       nextLabel={isLast ? "결과 보기" : "다음 라운드"}
@@ -153,6 +167,8 @@ function ResultStep({ store, question, record, onAgain }: { store: PracticeStore
       {attempts.map((attempt) => (
         <AttemptRow key={attempt.id} store={store} attempt={attempt} title={`${attempt.attemptNo}라운드 (${record.roundLimitsSec[attempt.attemptNo - 1] ?? "?"}초)`} onChanged={reload} />
       ))}
+      <PlanBox question={question} plan={record.plan} />
+      <ModelAnswerPanel questionId={question.id} />
       <h3>이 질문, 어땠나요?</h3>
       <div className="actions">
         <button type="button" onClick={() => void rate("stuck")} disabled={nextReview !== null}>막혔어요 (내일 다시)</button>

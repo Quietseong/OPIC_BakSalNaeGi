@@ -105,3 +105,11 @@ main.exam { max-width: 1040px; }
 .revision-ref { padding: 8px 12px; border-left: 4px solid var(--primary); background: var(--bg); }
 h3 { font-size: 1rem; margin: 16px 0 4px; }
 .record-row { display: flex; gap: 8px; flex-wrap: wrap; } .record-row .record-button { flex: 1; }
+.model-answer { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.model-answer summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.model-text { line-height: 1.8; font-size: 1.05rem; }
+.model-points { padding-left: 20px; }
+.study-guide { padding-left: 20px; }
+.plan-box { border: 2px solid var(--primary); border-radius: 10px; padding: 8px 16px; margin: 16px 0; background: var(--card); }
+.plan-box ol { padding-left: 20px; margin: 4px 0; }
+input[type="text"] { font: inherit; min-height: 40px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }

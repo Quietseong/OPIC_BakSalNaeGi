@@ -6,6 +6,7 @@ import { scheduleReview } from "../domain/review-schedule";
 import { rulesFor } from "../domain/types";
 import { nextAttemptNo } from "../storage/db";
 import { AttemptRow } from "./AttemptRow";
+import { ModelAnswerPanel } from "./ModelAnswerPanel";
 import { errorMessage, formatDate } from "./format";
 import { QuestionStep } from "./QuestionStep";
 
@@ -117,6 +118,7 @@ function ReviewItem({ store, sessionId, question, attempts, allAttempts, onChang
     <li className="card review-item">
       <h2 className="topic">{question.topic}</h2>
       <p className="prompt" lang="en">{question.prompt}</p>
+      <ModelAnswerPanel questionId={question.id} />
       {attempts.length === 0 && <p className="muted">저장된 답변이 없습니다.</p>}
       {attempts.map((attempt) => (
         <AttemptRow key={attempt.id} store={store} attempt={attempt} onChanged={onChanged} />

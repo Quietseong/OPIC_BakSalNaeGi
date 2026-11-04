@@ -6,6 +6,7 @@
   "scripts": {
     "audio": "node scripts/generate-audio.mjs",
     "tts:setup": "node scripts/setup-tts.mjs",
+    "audio:models": "node scripts/generate-audio.mjs --models",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

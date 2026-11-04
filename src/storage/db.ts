@@ -46,6 +46,10 @@ function upgrade(db: IDBDatabase, oldVersion: number): void {
   }
 }
 
+function normalizeTraining(stored: TrainingRecord): TrainingRecord {
+  return { ...stored, plan: stored.plan ?? [] };
+}
+
 function normalizeAttempt(stored: Attempt): Attempt {
   return { ...stored, transcript: stored.transcript ?? "", revised: stored.revised ?? "" };
 }
@@ -157,13 +161,14 @@ export class PracticeStore {
     return this.write("saveTraining", [TRAININGS], (tx) => tx.objectStore(TRAININGS).put(record));
   }
 
-  getTraining(id: string): Promise<TrainingRecord | undefined> {
-    return this.read("getTraining", TRAININGS, (s) => s.get(id));
+  async getTraining(id: string): Promise<TrainingRecord | undefined> {
+    const record = await this.read<TrainingRecord | undefined>("getTraining", TRAININGS, (s) => s.get(id));
+    return record && normalizeTraining(record);
   }
 
   async listTrainings(): Promise<TrainingRecord[]> {
     const records = await this.read<TrainingRecord[]>("listTrainings", TRAININGS, (s) => s.getAll());
-    return records.sort((a, b) => b.createdAt - a.createdAt);
+    return records.map(normalizeTraining).sort((a, b) => b.createdAt - a.createdAt);
   }
 
   saveReviewCard(card: ReviewCard): Promise<void> {

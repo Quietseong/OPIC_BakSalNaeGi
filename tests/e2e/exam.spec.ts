@@ -30,7 +30,7 @@ test("exam: two listens, hidden prompt, difficulty branch after question 7, 12 q
   await answerAndAdvance(page, 5);
   await expect(page.getByRole("heading", { name: "모든 문항을 마쳤습니다" })).toBeVisible();
   await page.getByRole("button", { name: "복기하기" }).click();
-  await expect(page.locator("audio")).toHaveCount(12);
+  await expect(page.locator(".attempt audio")).toHaveCount(12);
 });
 
 test("exam: progress resumes at the same question after a reload", async ({ page }) => {
@@ -95,7 +95,7 @@ test("errors: a failed save is shown, Next stays blocked, and retry stores the a
   await expect(page.getByRole("status").filter({ hasText: "답변이 저장되었습니다." })).toBeVisible();
   await page.getByRole("button", { name: "나가기 (진행 상태는 저장됨)" }).click();
   await page.getByRole("button", { name: "복기" }).click();
-  await expect(page.locator("audio")).toHaveCount(1);
+  await expect(page.locator(".attempt audio")).toHaveCount(1);
   await expect(page.locator("[data-attempt-no]")).toHaveCount(1);
 });
 
@@ -121,7 +121,7 @@ test("exam: when 40 minutes run out mid-answer the recording is saved and the se
   await page.clock.fastForward("40:00");
   await expect(page.getByRole("heading", { name: "모든 문항을 마쳤습니다" })).toBeVisible();
   await page.getByRole("button", { name: "복기하기" }).click();
-  await expect(page.locator("audio")).toHaveCount(1);
+  await expect(page.locator(".attempt audio")).toHaveCount(1);
 });
 
 test("leaving mid-answer keeps the recording", async ({ page }) => {
@@ -133,7 +133,7 @@ test("leaving mid-answer keeps the recording", async ({ page }) => {
   await page.waitForTimeout(1000);
   await page.getByRole("button", { name: "나가기 (진행 상태는 저장됨)" }).click();
   await page.getByRole("button", { name: "복기" }).click();
-  await expect(page.locator("audio")).toHaveCount(1);
+  await expect(page.locator(".attempt audio")).toHaveCount(1);
 });
 
 test("exam: a failed save at time-up keeps the retry instead of ending and losing the answer", async ({ page }) => {
@@ -161,5 +161,5 @@ test("exam: a failed save at time-up keeps the retry instead of ending and losin
   await page.getByRole("button", { name: "저장 다시 시도" }).click();
   await expect(page.getByRole("heading", { name: "모든 문항을 마쳤습니다" })).toBeVisible();
   await page.getByRole("button", { name: "복기하기" }).click();
-  await expect(page.locator("audio")).toHaveCount(1);
+  await expect(page.locator(".attempt audio")).toHaveCount(1);
 });

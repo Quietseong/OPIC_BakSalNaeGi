@@ -135,6 +135,7 @@ export type TrainingRecord = {
   questionId: string;
   createdAt: number;
   roundLimitsSec: number[];
+  plan: string[];
 };
 
 export type ReviewCard = {
@@ -142,4 +143,10 @@ export type ReviewCard = {
   box: number;
   dueAt: number;
   updatedAt: number;
+};
+
+export type ModelAnswer = {
+  questionId: string;
+  text: string;
+  points: string[];
 };

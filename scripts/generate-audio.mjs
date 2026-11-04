@@ -45,7 +45,6 @@ Write-Output $voice.VoiceInfo.Name
 
 const venvPython = join(root, ".tts", "venv", "Scripts", "python.exe");
 const modelsDir = join(root, ".tts", "models");
-const manifestPath = join(outDir, "manifest.json");
 
 function option(name, fallback) {
   const arg = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -70,21 +69,34 @@ function synthesize(jobFile) {
 }
 
 const wanted = { engine, voice, speed: engine === "kokoro" ? speed : null };
-const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : null;
-const voiceChanged = JSON.stringify(previous) !== JSON.stringify(wanted);
 
-const questions = await loadQuestions();
-mkdirSync(outDir, { recursive: true });
-const jobs = questions
-  .map((question) => ({ path: join(outDir, `${question.id}.wav`), text: question.prompt }))
-  .filter((job) => force || voiceChanged || !existsSync(job.path));
+async function loadModelAnswers() {
+  const parts = await Promise.all([1, 2, 3, 4].map((n) => loadModule(`src/domain/model-answers/part-${n}.ts`)));
+  return parts.flatMap((part, index) => part[`MODEL_ANSWERS_PART_${index + 1}`]);
+}
 
-if (jobs.length === 0) {
-  console.log(`audio up to date: ${questions.length} files (${engine} ${voice}) in ${outDir}`);
-} else {
+function generate(label, dir, items) {
+  const manifest = join(dir, "manifest.json");
+  const previous = existsSync(manifest) ? JSON.parse(readFileSync(manifest, "utf8")) : null;
+  const voiceChanged = JSON.stringify(previous) !== JSON.stringify(wanted);
+  mkdirSync(dir, { recursive: true });
+  const jobs = items
+    .map((item) => ({ path: join(dir, `${item.id}.wav`), text: item.text }))
+    .filter((job) => force || voiceChanged || !existsSync(job.path));
+  if (jobs.length === 0) {
+    console.log(`${label} audio up to date: ${items.length} files (${engine} ${voice}) in ${dir}`);
+    return;
+  }
   const jobFile = join(tmpdir(), `opic-audio-jobs-${Date.now()}.json`);
   writeFileSync(jobFile, JSON.stringify(jobs), "utf8");
   const used = synthesize(jobFile);
-  writeFileSync(manifestPath, JSON.stringify(wanted), "utf8");
-  console.log(`generated ${jobs.length} of ${questions.length} files with ${used} in ${outDir}`);
+  writeFileSync(manifest, JSON.stringify(wanted), "utf8");
+  console.log(`${label}: generated ${jobs.length} of ${items.length} files with ${used} in ${dir}`);
+}
+
+const questions = await loadQuestions();
+generate("questions", outDir, questions.map((question) => ({ id: question.id, text: question.prompt })));
+if (process.argv.includes("--models")) {
+  const answers = await loadModelAnswers();
+  generate("model answers", join(outDir, "model"), answers.map((answer) => ({ id: answer.questionId, text: answer.text })));
 }

@@ -9,9 +9,18 @@ test("training: three shrinking rounds, auto-stop at the limit, compare, transcr
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "오늘 복습할 질문 0개" })).toBeVisible();
   await page.getByRole("button", { name: "새 질문으로 3번 줄여 말하기" }).click();
-  await expect(page.getByText(/답변 뼈대 ·/)).toBeVisible();
   const prompt = await page.locator(".prompt[lang=en]").first().textContent();
   await page.getByRole("button", { name: "훈련 시작" }).click();
+
+  await expect(page.getByRole("heading", { name: "1단계 · 모범 답안 공부" })).toBeVisible();
+  const modelWords = (await page.locator(".model-text").textContent())?.trim().split(/\s+/).length ?? 0;
+  expect(modelWords).toBeGreaterThanOrEqual(100);
+  await page.getByRole("button", { name: "내 이야기로 바꾸기" }).click();
+  await expect(page.getByRole("heading", { name: "2단계 · 내 키워드 메모" })).toBeVisible();
+  await expect(page.getByText(/답변 뼈대 ·/)).toBeVisible();
+  await page.getByRole("textbox").first().fill("작년 가을, 민지랑, 연남동");
+  await page.getByRole("button", { name: "녹음하러 가기" }).click();
+  await expect(page.getByLabel("내 키워드 메모")).toContainText("작년 가을, 민지랑, 연남동");
 
   await expect(page.getByRole("heading", { name: "1라운드 · 제한 90초" })).toBeVisible();
   await page.getByRole("button", { name: /질문 듣기/ }).click();
@@ -29,7 +38,7 @@ test("training: three shrinking rounds, auto-stop at the limit, compare, transcr
   await answerCurrentQuestion(page);
   await page.getByRole("button", { name: "결과 보기" }).click();
 
-  await expect(page.locator("audio")).toHaveCount(3);
+  await expect(page.locator(".attempt audio")).toHaveCount(3);
   await expect(page.getByText(/^1라운드 \(90초\)/)).toBeVisible();
   const first = page.locator("[data-attempt-no='1']");
   await first.getByLabel(/받아쓰기/).fill("I go to cafe yesterday");
@@ -47,6 +56,7 @@ test("training: three shrinking rounds, auto-stop at the limit, compare, transcr
 
   await page.getByRole("button", { name: "결과 보기" }).click();
   await expect(page.locator("[data-attempt-no='1']").getByLabel(/고친 문장/)).toHaveValue("I went to a cafe yesterday");
+  await expect(page.getByLabel("내 키워드 메모")).toContainText("작년 가을, 민지랑, 연남동");
   await page.getByRole("button", { name: "처음으로" }).click();
 
   await page.getByRole("button", { name: "복습하기" }).click();
@@ -82,6 +92,8 @@ test("training: pausing stops the clock, so neither the limit nor the saved leng
   await page.goto("/");
   await page.getByRole("button", { name: "새 질문으로 3번 줄여 말하기" }).click();
   await page.getByRole("button", { name: "훈련 시작" }).click();
+  await page.getByRole("button", { name: "내 이야기로 바꾸기" }).click();
+  await page.getByRole("button", { name: "녹음하러 가기" }).click();
   await page.getByRole("button", { name: /질문 듣기/ }).click();
   await page.getByRole("button", { name: "녹음 시작" }).click();
   await expect(page.getByRole("button", { name: "일시정지" })).toBeVisible();

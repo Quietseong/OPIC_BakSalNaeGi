@@ -18,9 +18,9 @@ test("practice: full 14-question set survives a reload and can be reviewed, re-a
   await page.reload();
   await expect(page.getByText(/연습 · 완료/)).toBeVisible();
   await page.getByRole("button", { name: "복기" }).click();
-  await expect(page.locator("audio")).toHaveCount(14);
+  await expect(page.locator(".attempt audio")).toHaveCount(14);
 
-  const firstAudioBytes = await page.locator("audio").first().evaluate(async (audio: HTMLAudioElement) => {
+  const firstAudioBytes = await page.locator(".attempt audio").first().evaluate(async (audio: HTMLAudioElement) => {
     const blob = await (await fetch(audio.src)).blob();
     const buffer = await new AudioContext().decodeAudioData(await blob.arrayBuffer());
     return { size: blob.size, seconds: buffer.duration };
@@ -39,7 +39,7 @@ test("practice: full 14-question set survives a reload and can be reviewed, re-a
   await page.reload();
   await page.getByRole("button", { name: "복기" }).click();
   await expect(page.locator(".review-item").first().locator("[data-attempt-no='1']").getByLabel("자가 메모")).toHaveValue("과거 시제를 섞어 씀");
-  await expect(page.locator("audio")).toHaveCount(15);
+  await expect(page.locator(".attempt audio")).toHaveCount(15);
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "기록 내보내기 (JSON)" }).click();
@@ -49,7 +49,7 @@ test("practice: full 14-question set survives a reload and can be reviewed, re-a
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.locator(".review-item").first().locator("[data-attempt-no='2']").getByRole("button", { name: "답변 삭제" }).click();
-  await expect(page.locator("audio")).toHaveCount(14);
+  await expect(page.locator(".attempt audio")).toHaveCount(14);
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "이 기록 삭제" }).click();
