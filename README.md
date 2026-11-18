@@ -2,25 +2,85 @@
 
 질문을 듣고 영어 답변을 녹음한 뒤, 문항별로 다시 듣고 메모하는 개인용 로컬 웹 앱입니다. 서버, 로그인, 외부 전송이 없습니다. 녹음은 브라우저의 IndexedDB에만 저장됩니다.
 
-## 실행
+## 설치
 
-Node 20.18 이상이 필요합니다.
+### 준비물
+
+| 항목 | 용도 | 설치 |
+| --- | --- | --- |
+| Git | 코드 받기 | https://git-scm.com |
+| Node.js 20.18 이상 | 앱 실행 | https://nodejs.org (LTS) |
+| Chrome 또는 Edge | 앱 화면, 녹음 | 이미 있으면 생략 |
+| uv | 음성 엔진 Kokoro 설치 (권장) | PowerShell에서 `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"` |
+
+uv가 Python 3.12를 알아서 받으므로 Python을 따로 설치할 필요는 없습니다.
+
+### 1. 코드 받기와 의존성 설치
 
 ```bash
+git clone https://github.com/Quietseong/OPIC_BakSalNaeGi.git opic-practice
+cd opic-practice
 npm install
-npm run tts:setup   # (권장, 한 번만) 자연스러운 음성 엔진 Kokoro 설치. .tts/ 에 Python 환경과 모델 약 350MB
-npm run audio       # 질문 음성 WAV 생성 (public/audio, git 제외). 바뀐 것만 다시 만든다
-npm run audio:models  # (선택) 모범 답안 음성 생성 (public/audio/model). 없으면 브라우저 음성으로 읽는다
-npm run dev         # http://localhost:5173 을 Chrome 또는 Edge로 연다
 ```
 
-### 앱처럼 실행하기 (Windows)
+### 2. 음성 파일 만들기 (처음 한 번)
 
-`launch.vbs`를 더블클릭하면 로컬 서버가 꺼져 있을 때 켜고, 주소창 없는 Chrome 앱 창으로 엽니다. 바탕화면 바로가기는 대상 `wscript.exe "<이 폴더>\launch.vbs"`로 만듭니다. 창을 닫아도 서버는 백그라운드에 남습니다(완전히 끄려면 작업 관리자에서 node 종료 또는 PC 재시작).
+음성 파일은 용량이 커서 저장소에 없습니다. 내 PC에서 만듭니다. 모두 오프라인으로 동작합니다.
 
-기록은 브라우저의 `http://localhost:5173` 저장소에 있으므로 같은 브라우저와 포트를 계속 쓰세요. 다른 브라우저로 열면 빈 기록으로 보입니다.
+```bash
+npm run tts:setup      # Kokoro 음성 엔진 설치. .tts/ 에 약 350MB, 몇 분
+npm run audio          # 질문 음성 167개 → public/audio. CPU에서 15~20분
+npm run audio:models   # 모범 답안 음성 139개 → public/audio/model. CPU에서 약 1시간
+```
 
-질문 음성은 생성된 WAV, 브라우저 음성 합성, 질문 텍스트 순서로 시도합니다. 마이크는 localhost에서만 동작합니다.
+- 시간이 오래 걸리는 명령은 중간에 끊겨도 다시 실행하면 만든 파일은 건너뛰고 이어서 합니다.
+- 건너뛰어도 앱은 동작합니다. 질문은 브라우저 음성으로 읽고, 그것도 없으면 질문 텍스트를 보여 줍니다. 다만 브라우저에 영어 음성이 없는 PC가 많아서(한국어 Windows 기본값) 음성 파일을 만드는 것을 권장합니다.
+- uv 없이 Windows 기본 음성(기계음)으로 만들려면 `npm run audio -- --engine=windows`를 씁니다.
+
+### 3. 실행
+
+```bash
+npm run dev            # http://localhost:5173 을 Chrome 또는 Edge로 연다
+```
+
+처음 녹음할 때 브라우저가 마이크 권한을 묻습니다. 허용하세요. 마이크는 localhost에서만 동작합니다.
+
+### 4. 앱처럼 실행하기 (Windows, 선택)
+
+`launch.vbs`를 더블클릭하면 로컬 서버가 꺼져 있을 때 켜고, 주소창 없는 Chrome 앱 창으로 엽니다(Chrome이 없으면 Edge).
+
+바탕화면 바로가기를 만들려면 PowerShell에서 프로젝트 폴더로 이동한 뒤 실행합니다.
+
+```powershell
+$ws = New-Object -ComObject WScript.Shell
+$sc = $ws.CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\OPIc 연습.lnk")
+$sc.TargetPath = "$env:WINDIR\System32\wscript.exe"
+$sc.Arguments = "`"$PWD\launch.vbs`""
+$sc.WorkingDirectory = "$PWD"
+$sc.IconLocation = "$env:WINDIR\System32\SndVol.exe,0"
+$sc.Save()
+```
+
+- 창을 닫아도 서버는 백그라운드에 남습니다. PC를 재시작하면 꺼집니다.
+- 폴더를 옮기면 바로가기를 다시 만드세요.
+
+### 기록 보관
+
+녹음과 메모는 브라우저의 `http://localhost:5173` 저장소(IndexedDB)에만 있습니다. 서버나 클라우드로 보내지 않습니다.
+
+- 같은 브라우저와 포트(5173)를 계속 쓰세요. 다른 브라우저로 열면 빈 기록으로 보입니다.
+- 브라우저의 사이트 데이터를 지우면 기록도 지워집니다. 남기고 싶은 녹음은 복기 화면의 "음성 파일 받기"로 저장하세요.
+- 다른 PC로 기록을 옮기는 기능은 없습니다.
+
+### 업데이트
+
+```bash
+git pull
+npm install
+npm run audio && npm run audio:models   # 새로 생긴 문항·답안의 음성만 만든다
+```
+
+이미 있는 문항이나 답안의 문장이 바뀐 경우에는 파일 이름이 같아서 자동으로 다시 만들지 않습니다. 이때는 `npm run audio -- --force`, `npm run audio:models -- --force`로 전부 다시 만드세요.
 
 ### 질문 목소리 바꾸기
 
