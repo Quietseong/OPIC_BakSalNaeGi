@@ -14,6 +14,12 @@ npm run audio:models  # (선택) 모범 답안 음성 생성 (public/audio/model
 npm run dev         # http://localhost:5173 을 Chrome 또는 Edge로 연다
 ```
 
+### 앱처럼 실행하기 (Windows)
+
+`launch.vbs`를 더블클릭하면 로컬 서버가 꺼져 있을 때 켜고, 주소창 없는 Chrome 앱 창으로 엽니다. 바탕화면 바로가기는 대상 `wscript.exe "<이 폴더>\launch.vbs"`로 만듭니다. 창을 닫아도 서버는 백그라운드에 남습니다(완전히 끄려면 작업 관리자에서 node 종료 또는 PC 재시작).
+
+기록은 브라우저의 `http://localhost:5173` 저장소에 있으므로 같은 브라우저와 포트를 계속 쓰세요. 다른 브라우저로 열면 빈 기록으로 보입니다.
+
 질문 음성은 생성된 WAV, 브라우저 음성 합성, 질문 텍스트 순서로 시도합니다. 마이크는 localhost에서만 동작합니다.
 
 ### 질문 목소리 바꾸기
